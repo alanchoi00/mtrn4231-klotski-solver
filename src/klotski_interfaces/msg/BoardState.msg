@@ -1,4 +1,3 @@
 builtin_interfaces/Time stamp
 geometry_msgs/PoseStamped board_pose_map   # board_frame in map
-klotski_interfaces/BoardSpec spec
-klotski_interfaces/Piece[] pieces
+klotski_interfaces/Board board
