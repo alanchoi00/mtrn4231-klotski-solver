@@ -1,0 +1,4 @@
+klotski_interfaces/BoardState state
+---
+klotski_interfaces/MoveList plan
+bool solved

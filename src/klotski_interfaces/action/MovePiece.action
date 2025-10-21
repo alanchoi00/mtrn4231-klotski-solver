@@ -1,0 +1,9 @@
+# Goal
+klotski_interfaces/Move move
+---
+# Result
+bool success
+---
+# Feedback
+string phase                    # "approach"|"lift"|"slide"|"place"|"retreat"
+float32 progress                # 0..1 for current phase completion

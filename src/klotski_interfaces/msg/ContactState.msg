@@ -1,0 +1,1 @@
+# TODO: message for gripper sensor contact state
