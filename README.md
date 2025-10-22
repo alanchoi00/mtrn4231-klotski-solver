@@ -15,13 +15,48 @@ This project implements an automated Klotski puzzle solver that:
 
 ### Prerequisites
 
-- **ROS2 Humble** (or compatible)
+#### System Requirements
+
+- **ROS2 Humble**
 - **Node.js 18+** and npm
 - **Python 3.8+**
 - **OpenCV** (for computer vision)
 - **Camera** (USB webcam or built-in)
 - **Robotic Arm** (UR5e)
 - **Klotski Puzzle Board and Pieces**
+
+#### Required ROS2 Packages
+
+Install the following ROS2 packages:
+
+```bash
+# Core ROS2 packages
+sudo apt install ros-humble-rclpy
+sudo apt install ros-humble-std-msgs
+sudo apt install ros-humble-sensor-msgs
+sudo apt install ros-humble-action-msgs
+sudo apt install ros-humble-builtin-interfaces
+
+# TF2 for coordinate transforms
+sudo apt install ros-humble-tf2-ros
+
+# ROS Bridge for web interface
+sudo apt install ros-humble-rosbridge-server
+
+# Camera support
+sudo apt install ros-humble-v4l2-camera
+
+# UR5e Robot Driver and MoveIt Integration
+sudo apt install ros-humble-ur-robot-driver
+sudo apt install ros-humble-ur-moveit-config
+
+# Launch system
+sudo apt install ros-humble-launch
+sudo apt install ros-humble-launch-ros
+
+# Build tools
+sudo apt install ros-humble-ament-cmake
+```
 
 ### 1. Clone and Build ROS Workspace
 
