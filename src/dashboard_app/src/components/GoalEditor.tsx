@@ -17,7 +17,6 @@ import type {
 import {
   DndContext,
   DragEndEvent,
-  DragOverlay,
   DragStartEvent,
   PointerSensor,
   useDraggable,
@@ -55,16 +54,16 @@ type Block = {
 
 const START: Block[] = [
   // These positions are examples: tune them to match your preferred initial goal
-  { id: "red", color: "red", col: 1, row: 3, w: 2, h: 2 },
-  { id: "green", color: "green", col: 1, row: 2, w: 2, h: 1 },
-  { id: "b1", color: "blue", col: 0, row: 2, w: 1, h: 2 },
-  { id: "b2", color: "blue", col: 3, row: 2, w: 1, h: 2 },
-  { id: "b3", color: "blue", col: 0, row: 0, w: 1, h: 2 },
-  { id: "b4", color: "blue", col: 3, row: 0, w: 1, h: 2 },
-  { id: "y1", color: "yellow", col: 0, row: 4, w: 1, h: 1 },
-  { id: "y2", color: "yellow", col: 2, row: 1, w: 1, h: 1 },
-  { id: "y3", color: "yellow", col: 1, row: 1, w: 1, h: 1 },
-  { id: "y4", color: "yellow", col: 3, row: 4, w: 1, h: 1 },
+  { id: "a", color: "blue", col: 0, row: 3, w: 1, h: 2 },
+  { id: "b", color: "red", col: 1, row: 3, w: 2, h: 2 },
+  { id: "c", color: "blue", col: 3, row: 3, w: 1, h: 2 },
+  { id: "d", color: "green", col: 1, row: 2, w: 2, h: 1 },
+  { id: "e", color: "blue", col: 0, row: 0, w: 1, h: 2 },
+  { id: "f", color: "yellow", col: 1, row: 1, w: 1, h: 1 },
+  { id: "g", color: "yellow", col: 2, row: 1, w: 1, h: 1 },
+  { id: "h", color: "blue", col: 3, row: 0, w: 1, h: 2 },
+  { id: "i", color: "yellow", col: 1, row: 0, w: 1, h: 1 },
+  { id: "j", color: "yellow", col: 2, row: 0, w: 1, h: 1 },
 ];
 
 function inBounds(b: Block, spec = SPEC): boolean {
@@ -191,7 +190,7 @@ export const GoalEditor: React.FC = () => {
         <div>
           <CardTitle>Goal Pattern Editor</CardTitle>
           <CardDescription>
-            Drag pieces to define the desired 4×5 layout (color ={">"} shape).
+            Drag pieces to define the desired 4×5 layout.
           </CardDescription>
         </div>
         <Badge variant={connected ? "default" : "secondary"}>
@@ -220,6 +219,7 @@ export const GoalEditor: React.FC = () => {
               bg-white
             `}
           >
+            {/* Grid lines */}
             <div
               className="absolute inset-0 grid"
               style={{
@@ -231,78 +231,72 @@ export const GoalEditor: React.FC = () => {
                 <div key={i} className="border border-black/10" />
               ))}
             </div>
+            <div
+              className={`
+                pointer-events-none absolute right-0 bottom-0 left-0 grid
+                text-[10px] text-muted-foreground
+                sm:text-xs
+              `}
+              style={{
+                gridTemplateColumns: `repeat(${SPEC.cols}, 1fr)`,
+                transform: "translateY(100%)", // sit just below grid
+              }}
+            >
+              {Array.from({ length: SPEC.cols }, (_, c) => (
+                <div key={c} className="py-0.5 text-center">
+                  {c}
+                </div>
+              ))}
+            </div>
 
+            <div
+              className={`
+                pointer-events-none absolute top-0 bottom-0 left-0 grid
+                text-[10px] text-muted-foreground
+                sm:text-xs
+              `}
+              style={{
+                gridTemplateRows: `repeat(${SPEC.rows}, 1fr)`,
+                transform: "translateX(-100%)", // sit just left of grid
+              }}
+            >
+              {Array.from({ length: SPEC.rows }, (_, rFromTop) => {
+                const r = SPEC.rows - 1 - rFromTop; // flip so 0 is bottom
+                return (
+                  <div key={r} className="flex items-center justify-end pr-1">
+                    {r}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              className={`
+                pointer-events-none absolute -bottom-8 left-0 text-xs
+                font-medium text-muted-foreground
+                sm:text-sm
+              `}
+            >
+              col →
+            </div>
+
+            <div
+              className={`
+                pointer-events-none absolute bottom-8 -left-6 origin-top-left
+                translate-x-1 rotate-90 text-xs font-medium
+                text-muted-foreground
+                sm:text-sm
+              `}
+            >
+              ← row
+            </div>
+
+            {/* Draggable blocks */}
             {blocks.map((block) => (
               <DraggableBlock key={block.id} block={block} />
             ))}
           </div>
-
-          <DragOverlay>
-            {activeId ? (
-              <div
-                style={{
-                  background:
-                    COLORS[
-                      blocks.find((b) => b.id === activeId)?.color || "red"
-                    ],
-                  borderRadius: 10,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
-                  border: "1px solid rgba(0,0,0,0.15)",
-                  width: `${
-                    ((blocks.find((b) => b.id === activeId)?.w || 1) /
-                      SPEC.cols) *
-                    100
-                  }%`,
-                  height: `${
-                    ((blocks.find((b) => b.id === activeId)?.h || 1) /
-                      SPEC.rows) *
-                    100
-                  }%`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontWeight: "600",
-                }}
-              >
-                {activeId}
-              </div>
-            ) : null}
-          </DragOverlay>
         </DndContext>
-
-        <div className="text-xs text-muted-foreground">
-          <span
-            className="mr-2 inline-block rounded px-2 py-1"
-            style={{ background: COLORS.red, color: "white" }}
-          >
-            red = 2×2
-          </span>
-          <span
-            className="mr-2 inline-block rounded px-2 py-1"
-            style={{ background: COLORS.green, color: "white" }}
-          >
-            green = 2×1 (h)
-          </span>
-          <span
-            className="mr-2 inline-block rounded px-2 py-1"
-            style={{ background: COLORS.blue, color: "white" }}
-          >
-            blue = 1×2 (v)
-          </span>
-          <span
-            className="mr-2 inline-block rounded px-2 py-1"
-            style={{ background: COLORS.yellow, color: "black" }}
-          >
-            yellow = 1×1
-          </span>
-          <span
-            className="inline-block rounded px-2 py-1"
-            style={{ background: "#9ca3af", color: "black" }}
-          >
-            gray = exit / gap (not a piece)
-          </span>
-        </div>
       </CardContent>
     </Card>
   );
