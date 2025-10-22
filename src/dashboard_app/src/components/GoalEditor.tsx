@@ -1,5 +1,19 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import type {
+  BoardMsg,
+  BoardSpecMsg,
+  CellMsg,
+  PieceMsg,
+} from "@/lib/ros/types";
 import {
   DndContext,
   DragEndEvent,
@@ -11,24 +25,9 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { restrictToParentElement } from "@dnd-kit/modifiers";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardDescription,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import React, { useMemo, useState } from "react";
 import { useROS } from "./ROSProvider";
-import type {
-  BoardMsg,
-  BoardSpecMsg,
-  PieceMsg,
-  CellMsg,
-} from "@/lib/ros/types";
 
-/** ====== CONFIG ====== */
 const SPEC: BoardSpecMsg = {
   cols: 4,
   rows: 5,
@@ -132,7 +131,7 @@ const DraggableBlock: React.FC<{ block: Block }> = ({ block }) => {
       style={style}
       {...listeners}
       {...attributes}
-      className="flex items-center justify-center text-white font-semibold"
+      className="flex items-center justify-center font-semibold text-white"
     >
       {block.id}
     </div>
@@ -192,7 +191,7 @@ export const GoalEditor: React.FC = () => {
         <div>
           <CardTitle>Goal Pattern Editor</CardTitle>
           <CardDescription>
-            Drag pieces to define the desired 4×5 layout (color ⇒ shape).
+            Drag pieces to define the desired 4×5 layout (color ={">"} shape).
           </CardDescription>
         </div>
         <Badge variant={connected ? "default" : "secondary"}>
@@ -216,7 +215,10 @@ export const GoalEditor: React.FC = () => {
         >
           <div
             id="klotski-grid"
-            className="relative mx-auto aspect-4/5 w-full max-w-md rounded-md border bg-white"
+            className={`
+              relative mx-auto aspect-4/5 w-full max-w-md rounded-md border
+              bg-white
+            `}
           >
             <div
               className="absolute inset-0 grid"
@@ -271,25 +273,25 @@ export const GoalEditor: React.FC = () => {
 
         <div className="text-xs text-muted-foreground">
           <span
-            className="inline-block rounded px-2 py-1 mr-2"
+            className="mr-2 inline-block rounded px-2 py-1"
             style={{ background: COLORS.red, color: "white" }}
           >
             red = 2×2
           </span>
           <span
-            className="inline-block rounded px-2 py-1 mr-2"
+            className="mr-2 inline-block rounded px-2 py-1"
             style={{ background: COLORS.green, color: "white" }}
           >
             green = 2×1 (h)
           </span>
           <span
-            className="inline-block rounded px-2 py-1 mr-2"
+            className="mr-2 inline-block rounded px-2 py-1"
             style={{ background: COLORS.blue, color: "white" }}
           >
             blue = 1×2 (v)
           </span>
           <span
-            className="inline-block rounded px-2 py-1 mr-2"
+            className="mr-2 inline-block rounded px-2 py-1"
             style={{ background: COLORS.yellow, color: "black" }}
           >
             yellow = 1×1

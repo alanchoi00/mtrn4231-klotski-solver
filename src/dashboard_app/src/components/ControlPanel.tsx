@@ -1,25 +1,25 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
-import { useROS } from "./ROSProvider";
-import { UIMode } from "@/lib/ros/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
-  CardContent,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RefreshCw, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
+import { UIMode } from "@/lib/ros/types";
+import { Pause, Play, RefreshCw, RotateCcw, SkipForward } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { useROS } from "./ROSProvider";
 
 export const ControlPanel: React.FC = () => {
   const { connected, sendUICommand, subscribeEvents } = useROS();
@@ -36,7 +36,9 @@ export const ControlPanel: React.FC = () => {
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const scrollContainer = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
@@ -138,7 +140,10 @@ export const ControlPanel: React.FC = () => {
               <h3 className="font-semibold">Events</h3>
               <Badge variant="secondary">{events.length}</Badge>
             </div>
-            <ScrollArea ref={scrollAreaRef} className="h-64 rounded-md border bg-muted/30 p-3">
+            <ScrollArea
+              ref={scrollAreaRef}
+              className={`h-64 rounded-md border bg-muted/30 p-3`}
+            >
               <ul className="space-y-1 text-sm">
                 {events.map((e, i) => (
                   <li key={i} className="truncate">
