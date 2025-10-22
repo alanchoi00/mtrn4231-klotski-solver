@@ -2,6 +2,7 @@ import { ROSProvider } from "@/components/ROSProvider";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,6 +20,9 @@ export const metadata: Metadata = {
   description: "Dashboard for controlling the Klotski solver",
 };
 
+const ROSBRIDGE_URL: string =
+  process.env.NEXT_PUBLIC_ROSBRIDGE_URL || "ws://localhost:9090";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <ROSProvider>
+      <ROSProvider url={ROSBRIDGE_URL} maxRetries={10} retryInterval={5000}>
         <body
           className={`
             ${geistSans.variable}
@@ -36,6 +40,7 @@ export default function RootLayout({
         >
           {children}
         </body>
+        <Toaster />
       </ROSProvider>
     </html>
   );
