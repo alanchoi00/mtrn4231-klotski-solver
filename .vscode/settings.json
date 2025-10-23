@@ -14,6 +14,16 @@
     "cSpell.advanced.feature.useReferenceProviderWithRename": true,
     "cSpell.advanced.feature.useReferenceProviderRemove": "/^#+\\s/"
   },
+  "[python]": {
+    "diffEditor.ignoreTrimWhitespace": false,
+    "editor.defaultColorDecorators": "never",
+    "gitlens.codeLens.symbolScopes": [
+      "!Module"
+    ],
+    "editor.formatOnType": true,
+    "editor.wordBasedSuggestions": "off",
+    "files.saveConflictResolution": "overwriteFileOnDisk"
+  },
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit",
     "source.organizeImports": "explicit"
@@ -23,5 +33,57 @@
   "editor.trimAutoWhitespace": true,
   "files.eol": "\n",
   "files.insertFinalNewline": true,
-  "typescript.tsdk": "./node_modules/typescript/lib"
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "C_Cpp.clang_format_fallbackStyle": "Google",
+  "files.associations": {
+    "iostream": "cpp"
+  },
+  "python.autoComplete.extraPaths": [
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_ui/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_sense/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_plan/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_manipulation/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_brain/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/build/pkg_ui",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_ui/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_sense/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_plan/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_manipulation/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_brain/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ros_ur_driver/install/ur_robot_driver/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ros_ur_driver/install/ur_moveit_config/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ros_ur_driver/install/ur_dashboard_msgs/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ws_moveit2/install/moveit_configs_utils/lib/python3.10/site-packages",
+    "/home/mtrn/4231/ws_moveit2/install/srdfdom/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ws_moveit2/install/moveit_task_constructor_msgs/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ws_moveit2/install/launch_param_builder/lib/python3.10/site-packages",
+    "/opt/ros/humble/lib/python3.10/site-packages",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages"
+  ],
+  "python.analysis.extraPaths": [
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_ui/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_sense/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_plan/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_manipulation/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_brain/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/build/pkg_ui",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_ui/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_sense/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_plan/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_manipulation/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_brain/lib/python3.10/site-packages",
+    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ros_ur_driver/install/ur_robot_driver/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ros_ur_driver/install/ur_moveit_config/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ros_ur_driver/install/ur_dashboard_msgs/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ws_moveit2/install/moveit_configs_utils/lib/python3.10/site-packages",
+    "/home/mtrn/4231/ws_moveit2/install/srdfdom/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ws_moveit2/install/moveit_task_constructor_msgs/local/lib/python3.10/dist-packages",
+    "/home/mtrn/4231/ws_moveit2/install/launch_param_builder/lib/python3.10/site-packages",
+    "/opt/ros/humble/lib/python3.10/site-packages",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages"
+  ]
 }
