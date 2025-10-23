@@ -1,5 +1,5 @@
 klotski_interfaces/BoardState state
 klotski_interfaces/Board goal
 ---
-klotski_interfaces/MoveList plan
+klotski_interfaces/MoveList moves
 bool solved
