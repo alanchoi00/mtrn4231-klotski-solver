@@ -1,0 +1,47 @@
+#pragma once
+
+#include "rclcpp/rclcpp.hpp"
+#include "pkg_plan/klotski_solver.hpp"
+#include "klotski_interfaces/srv/solve_board.hpp"
+#include <memory>
+
+/**
+ * @brief ROS2 service node for solving Klotski puzzles
+ *
+ * This node provides a service that accepts BoardState and Board goal
+ * and returns a MoveList containing the solution path.
+ */
+class SolveServiceNode : public rclcpp::Node {
+ public:
+  /**
+   * @brief Construct a new Solve Service Node
+   */
+  SolveServiceNode();
+
+ private:
+  std::shared_ptr<klotski::KlotskiSolver> solver_;
+  rclcpp::Service<klotski_interfaces::srv::SolveBoard>::SharedPtr service_;
+
+  /**
+   * @brief Validate board state input
+   * @param state The board state to validate
+   * @return true if valid, false otherwise
+   */
+  bool validateBoardState(const klotski_interfaces::msg::BoardState& state) const;
+
+  /**
+   * @brief Validate board input
+   * @param board The board to validate
+   * @return true if valid, false otherwise
+   */
+  bool validateBoard(const klotski_interfaces::msg::Board& board) const;
+
+  /**
+   * @brief Handle solve board service requests
+   * @param request The service request containing state and goal
+   * @param response The service response containing moves and solved flag
+   */
+  void handleSolveBoard(
+      const std::shared_ptr<klotski_interfaces::srv::SolveBoard::Request> request,
+      std::shared_ptr<klotski_interfaces::srv::SolveBoard::Response> response);
+};

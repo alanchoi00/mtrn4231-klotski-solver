@@ -8,12 +8,17 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(klotski_interfaces REQUIRED)
+find_package(rclcpp REQUIRED)
 
 include_directories(include)
 
 add_executable(klotski_solve_cli src/solve_cli.cpp src/klotski_solver.cpp)
 ament_target_dependencies(klotski_solve_cli klotski_interfaces)
 install(TARGETS klotski_solve_cli DESTINATION lib/${PROJECT_NAME})
+
+add_executable(klotski_solve_service src/solve_service.cpp src/solve_service_node.cpp src/klotski_solver.cpp)
+ament_target_dependencies(klotski_solve_service rclcpp klotski_interfaces)
+install(TARGETS klotski_solve_service DESTINATION lib/${PROJECT_NAME})
 
 
 if(BUILD_TESTING)

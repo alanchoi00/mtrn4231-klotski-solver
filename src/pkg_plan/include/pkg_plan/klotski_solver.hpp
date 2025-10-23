@@ -12,6 +12,9 @@
 #include "klotski_interfaces/msg/move.hpp"
 #include "klotski_interfaces/msg/move_list.hpp"
 #include "klotski_interfaces/msg/piece.hpp"
+#include "klotski_interfaces/msg/board_state.hpp"
+#include "klotski_interfaces/msg/board.hpp"
+#include "klotski_interfaces/msg/board_spec.hpp"
 
 namespace klotski {
 
@@ -40,9 +43,10 @@ class KlotskiSolver {
   std::vector<Move> solve(const std::string& start,
                           const std::string& goal) const;
 
-  /// Solve and return MoveList message format (bottom-left origin coordinates)
+  /// Solve using BoardState and Board
   klotski_interfaces::msg::MoveList solveMoveList(
-      const std::string& start, const std::string& goal) const;
+      const klotski_interfaces::msg::BoardState& state,
+      const klotski_interfaces::msg::Board& goal) const;
 
   /// Coalesce consecutive identical (piece, dir) into single entries
   /// (cosmetic).
@@ -88,6 +92,9 @@ class KlotskiSolver {
 
   /// Convert from top-origin row to bottom-left origin row
   static int toBottomLeftRow(int topRow) { return H - 1 - topRow; }
+
+  /// Convert Board message to internal string representation
+  static std::string boardToString(const klotski_interfaces::msg::Board& board);
 
  private:
   static void assertRep(const std::string& rep);

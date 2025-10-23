@@ -50,9 +50,12 @@ std::vector<KlotskiSolver::Move> KlotskiSolver::solve(
 }
 
 klotski_interfaces::msg::MoveList KlotskiSolver::solveMoveList(
-    const std::string& start, const std::string& goal) const {
-  auto moves = solve(start, goal);
-  return convertToMoveList(moves, start);
+    const klotski_interfaces::msg::BoardState& state,
+    const klotski_interfaces::msg::Board& goal) const {
+  std::string startRep = boardToString(state.board);
+  std::string goalRep = boardToString(goal);
+  auto moves = solve(startRep, goalRep);
+  return convertToMoveList(moves, startRep);
 }
 
 std::string KlotskiSolver::applyStep(const std::string& rep, char piece,
@@ -204,6 +207,32 @@ klotski_interfaces::msg::MoveList KlotskiSolver::convertToMoveList(
   }
 
   return moveList;
+}
+
+std::string KlotskiSolver::boardToString(const klotski_interfaces::msg::Board& board) {
+  // Initialize empty board with dots
+  std::string rep(N, '.');
+  
+  // Place pieces on the board
+  for (const auto& piece : board.pieces) {
+    if (piece.id.empty()) continue;
+    
+    char pieceChar = piece.id[0];  // Use first character of piece ID
+    
+    for (const auto& cell : piece.cells) {
+      // Convert from bottom-left origin (ROS) to top-origin (internal)
+      int topRow = toBottomLeftRow(cell.row);
+      int col = cell.col;
+      
+      // Validate bounds
+      if (inBounds(topRow, col)) {
+        int idx = idxOf(topRow, col);
+        rep[idx] = pieceChar;
+      }
+    }
+  }
+  
+  return rep;
 }
 
 }  // namespace klotski
