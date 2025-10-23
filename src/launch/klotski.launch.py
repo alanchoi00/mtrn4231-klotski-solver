@@ -1,8 +1,10 @@
+from launch_ros.actions import Node
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch_ros.actions import Node
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
+
 
 def generate_launch_description():
     start_rosbridge = LaunchConfiguration('start_rosbridge')
@@ -27,4 +29,14 @@ def generate_launch_description():
             output='screen',
             condition=IfCondition(start_rosbridge),
         ),
+
+        Node(
+            package='pkg_plan',
+            executable='klotski_solve_service',
+            name='solve_service',
+            output='screen',
+            parameters=[{
+                'use_sim_time': False,
+            }],
+        )
     ])
