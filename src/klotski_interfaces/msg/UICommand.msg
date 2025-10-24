@@ -1,2 +1,6 @@
-string mode        # "auto"|"step"|"pause"|"reset"
+uint8 MODE_AUTO=0
+uint8 MODE_STEP=1
+uint8 MODE_PAUSE=2
+uint8 MODE_RESET=3
+uint8 mode
 bool replan # re-solve the puzzle
