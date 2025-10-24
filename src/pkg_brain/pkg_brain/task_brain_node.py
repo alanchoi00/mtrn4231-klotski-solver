@@ -1,12 +1,14 @@
 from typing import Optional
+
 import rclpy
-from rclpy.node import Node
 from rclpy.action import ActionClient
+from rclpy.node import Node
 from std_msgs.msg import String
 
-from klotski_interfaces.msg import UICommand, BoardState, Move, MoveList, Board
-from klotski_interfaces.srv import SolveBoard
 from klotski_interfaces.action import MovePiece
+from klotski_interfaces.msg import Board, BoardState, Move, MoveList, UICommand
+from klotski_interfaces.srv import SolveBoard
+
 
 class TaskBrain(Node):
     """
