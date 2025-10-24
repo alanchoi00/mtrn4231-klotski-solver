@@ -1,0 +1,11 @@
+Move ：
+    piece (Piece type)
+      id (string)          - the piece ID, e.g "a", "b", "d"
+        cells (Cell type)      - all grid cless occupied by the piece 
+        each cell inlucdes：
+                col (uint32) - column index
+                row (uint32) - row index
+        color (string)       - color, e.g. "red", "green"
+    to_cell (Cell type)       - target position
+        col (uint32)          - target column index
+        row (uint32)          - target row index
