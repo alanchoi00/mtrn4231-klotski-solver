@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from rclpy.node import Node
 from rclpy.task import Future
 
 from klotski_interfaces.msg import MoveList
 from klotski_interfaces.srv import CaptureBoard, SolveBoard
 
 from ..context import ExecutionPhase
-
-if TYPE_CHECKING:
-    from rclpy.node import Node
 
 
 class ServiceManager:

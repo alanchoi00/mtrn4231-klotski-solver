@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from rclpy.action import ActionClient
+from rclpy.node import Node
 from rclpy.task import Future
 
 from klotski_interfaces.action import GripPiece, MovePiece
@@ -10,9 +9,6 @@ from klotski_interfaces.msg import Move
 
 from ..context import ExecutionPhase
 from ..ui_modes import UIMode
-
-if TYPE_CHECKING:
-    from rclpy.node import Node
 
 
 class ActionExecutor:

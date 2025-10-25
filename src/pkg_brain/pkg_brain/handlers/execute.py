@@ -34,7 +34,7 @@ class ExecuteHandler(BaseHandler):
             if node.start_execute_next_move():
                 return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
             else:
-                node.ui("[exec] manipulation not implemented; skipping phase")
+                node.ui(f"[exec] manipulation not implemented; skipping phase {current_phase_name}")
                 # emulate "done one phase" even if not implemented:
                 next_phase = ExecutionPhase.next_phase(ctx.current_phase)
                 if next_phase is not None:

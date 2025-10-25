@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from rclpy.node import Node
 from std_msgs.msg import String
 
 from klotski_interfaces.msg import Board, UICommand
 
 from ..ui_modes import UIMode
-
-if TYPE_CHECKING:
-    from rclpy.node import Node
 
 
 class UIManager:

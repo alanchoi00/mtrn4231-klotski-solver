@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import List
+
+from rclpy.node import Node
 
 from ..handlers import (BaseHandler, ExecuteHandler, HandlerStatus,
                         PlanHandler, SenseHandler)
 from ..ui_modes import UIMode
-
-if TYPE_CHECKING:
-    from rclpy.node import Node
 
 
 class PipelineOrchestrator:
