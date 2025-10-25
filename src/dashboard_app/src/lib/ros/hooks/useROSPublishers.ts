@@ -1,5 +1,5 @@
 "use client";
-import type { BoardMsg, UICommandMsg, UIMode } from "@/lib/ros/types";
+import { BoardMsg, UICommandMsg, UIMode } from "@/lib/ros/types";
 import { useCallback } from "react";
 import ROSLIB, { type Ros } from "roslib";
 import { toast } from "sonner";
@@ -27,11 +27,11 @@ export const useROSPublishers = (ros?: Ros, showToasts = true) => {
         pub.publish(new ROSLIB.Message(msg));
 
         if (showToasts) {
-          toast.success(`Command sent: ${mode}`, {
+          toast.success(`Command sent: ${UIMode[mode]}`, {
             description: replan ? "Replanning requested" : undefined,
           });
         }
-        console.log(`UI command sent: ${mode}, replan: ${replan}`);
+        console.log(`UI command sent: ${UIMode[mode]}, replan: ${replan}`);
       } catch (error) {
         console.error("Failed to send UI command:", error);
         if (showToasts) {
