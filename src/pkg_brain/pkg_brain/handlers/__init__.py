@@ -10,12 +10,14 @@ from .base import BaseHandler, BrainNodeLike, HandlerResult
 from .execute import ExecuteHandler
 from .plan import PlanHandler
 from .sense import SenseHandler
+from .status import HandlerStatus
 
 __all__ = [
     # Base classes and types
     "BaseHandler",
     "BrainNodeLike",
     "HandlerResult",
+    "HandlerStatus",
 
     # Handler implementations
     "SenseHandler",

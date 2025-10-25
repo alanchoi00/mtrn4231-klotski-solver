@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Protocol, Tuple
+from typing import Protocol
 
 from ..context import BrainContext
+from .status import HandlerResult, HandlerStatus
 
 
 # Minimal protocol to avoid importing rclpy in this file
@@ -16,15 +17,8 @@ class BrainNodeLike(Protocol):
     def start_execute_next_move(self) -> bool: ...
 
 
-# Return values:
-#  - "next"    : handled / nothing to do now, continue to next handler
-#  - "pending" : async started, stop pipeline; a callback will re-tick
-#  - "done"    : terminal for this tick (e.g., paused / no work)
-HandlerResult = Tuple[str, str]  # (result, reason)
-
-
 class BaseHandler:
     name = "base"
 
     def handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult: # noqa: F841
-        return ("next", "base noop")
+        return HandlerResult(HandlerStatus.NEXT, "base noop")

@@ -130,14 +130,11 @@
     "variant": "cpp"
   },
   "python.autoComplete.extraPaths": [
-    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_ui/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_sense/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_plan/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_manipulation/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_brain/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/klotski_interfaces/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/mtrn4231-klotski-solver/src/build/pkg_ui",
-    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_ui/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_sense/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_plan/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_manipulation/lib/python3.10/site-packages",
@@ -154,14 +151,11 @@
     "/opt/ros/humble/local/lib/python3.10/dist-packages"
   ],
   "python.analysis.extraPaths": [
-    "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_ui/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_sense/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_plan/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_manipulation/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/pkg_brain/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/install/klotski_interfaces/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/mtrn4231-klotski-solver/src/build/pkg_ui",
-    "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_ui/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_sense/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_plan/lib/python3.10/site-packages",
     "/home/mtrn/4231/mtrn4231-klotski-solver/src/install/pkg_manipulation/lib/python3.10/site-packages",

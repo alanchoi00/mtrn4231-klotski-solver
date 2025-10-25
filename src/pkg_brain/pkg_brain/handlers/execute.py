@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..context import BrainContext
 from ..ui_modes import UIMode
 from .base import BaseHandler, BrainNodeLike, HandlerResult
+from .status import HandlerResult, HandlerStatus
 
 
 class ExecuteHandler(BaseHandler):
@@ -11,40 +12,47 @@ class ExecuteHandler(BaseHandler):
     def handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
         # Only execute if we have received a plan
         if not ctx.plan_received:
-            return ("done", "no plan")
+            return HandlerResult(HandlerStatus.DONE, "no plan")
 
         if ctx.plan_index >= len(ctx.plan):
             if len(ctx.plan) == 0:
                 node.ui("[exec] Goal already achieved (0 moves needed)")
             else:
                 node.ui("[exec] Plan complete")
-            return ("done", "complete")
+            return HandlerResult(HandlerStatus.DONE, "complete")
 
         if ctx.mode == UIMode.PAUSE or ctx.mode == UIMode.IDLE:
-            return ("done", f"mode={UIMode.to_string(ctx.mode)}")
+            return HandlerResult(HandlerStatus.DONE, f"mode={UIMode.to_string(ctx.mode)}")
 
         if ctx.busy:
-            return ("done", "busy with current action")
+            return HandlerResult(HandlerStatus.DONE, "busy with current action")
 
-        # STEP mode: run exactly one move and then pause
+        # STEP mode: run exactly one phase and then pause
         if ctx.mode == UIMode.STEP:
-            node.debug("[exec] STEP: executing one move")
+            phase_names = ["approach", "grip_open", "pick_place", "grip_close", "retreat"]
+            current_phase_name = phase_names[ctx.current_phase] if ctx.current_phase < 5 else "unknown"
+            node.debug(f"[exec] STEP: executing {current_phase_name} phase")
             if node.start_execute_next_move():
-                return ("pending", "executing 1 step")
+                return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
             else:
-                node.ui("[exec] manipulation not implemented; skipping move")
-                # emulate "done one step" even if not implemented:
-                ctx.plan_index += 1
+                node.ui("[exec] manipulation not implemented; skipping phase")
+                # emulate "done one phase" even if not implemented:
+                ctx.current_phase += 1
+                if ctx.current_phase > 4:
+                    ctx.plan_index += 1
+                    ctx.current_phase = 0
                 ctx.mode = UIMode.PAUSE
-                return ("done", "skipped one step (not implemented)")
+                return HandlerResult(HandlerStatus.DONE, "skipped one phase (not implemented)")
 
-        # AUTO mode: run next move; result callback will trigger next tick
+        # AUTO mode: run next phase; result callback will trigger next tick
         if ctx.mode == UIMode.AUTO:
-            node.debug("[exec] AUTO: executing next move")
+            phase_names = ["approach", "grip_open", "pick_place", "grip_close", "retreat"]
+            current_phase_name = phase_names[ctx.current_phase] if ctx.current_phase < 5 else "unknown"
+            node.debug(f"[exec] AUTO: executing {current_phase_name} phase")
             if node.start_execute_next_move():
-                return ("pending", "executing next")
+                return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
             else:
                 node.ui("[exec] manipulation not implemented; cannot execute")
-                return ("done", "not implemented")
+                return HandlerResult(HandlerStatus.DONE, "not implemented")
 
-        return ("done", f"unknown mode={UIMode.to_string(ctx.mode)}")
+        return HandlerResult(HandlerStatus.DONE, f"unknown mode={UIMode.to_string(ctx.mode)}")

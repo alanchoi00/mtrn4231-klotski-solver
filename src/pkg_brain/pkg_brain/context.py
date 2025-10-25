@@ -25,6 +25,7 @@ class BrainContext:
     # Execution flags
     busy: bool = False           # currently sending action
     replan_requested: bool = False  # flag from UI "replan" or after sense
+    current_phase: int = 0       # current execution phase (0=approach, 1=open, 2=pick_place, 3=close, 4=retreat)
 
     # Book-keeping
     last_error: str = ""
@@ -37,5 +38,6 @@ class BrainContext:
         self.plan_received = False
         self.busy = False
         self.replan_requested = False
+        self.current_phase = 0
         self.last_error = ""
         self.mode = UIMode.PAUSE     # after reset, remain paused

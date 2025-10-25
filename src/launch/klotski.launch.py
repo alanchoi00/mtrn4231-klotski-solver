@@ -20,6 +20,7 @@ def generate_launch_description():
                 'auto_continue': True,
                 'relocalise_between_moves': True,
             }],
+            arguments=['--ros-args', '--log-level', 'DEBUG']
         ),
 
         Node(
@@ -38,5 +39,6 @@ def generate_launch_description():
             parameters=[{
                 'use_sim_time': False,
             }],
+            arguments=['--ros-args', '--log-level', 'DEBUG']
         )
     ])

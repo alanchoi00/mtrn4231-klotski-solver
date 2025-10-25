@@ -8,12 +8,13 @@ from rclpy.node import Node
 from rclpy.task import Future
 from std_msgs.msg import String
 
-from klotski_interfaces.action import MovePiece
+from klotski_interfaces.action import GripPiece, MovePiece
 from klotski_interfaces.msg import Board, BoardState, Move, MoveList, UICommand
 from klotski_interfaces.srv import CaptureBoard, SolveBoard
 
 from .context import BrainContext
-from .handlers import BaseHandler, ExecuteHandler, PlanHandler, SenseHandler
+from .handlers import (BaseHandler, ExecuteHandler, HandlerStatus, PlanHandler,
+                       SenseHandler)
 from .ui_modes import UIMode
 
 
@@ -40,8 +41,9 @@ class TaskBrain(Node):
         # sense service
         self.sense_cli = self.create_client(CaptureBoard, "/sense/capture_board")
 
-        # manip action (may not exist yet)
-        self.move_client: ActionClient = ActionClient(self, MovePiece, "/move_piece")
+        # manipulation actions
+        self.move_client: ActionClient = ActionClient(self, MovePiece, "/arm_manipulation/move_piece")
+        self.grip_client: ActionClient = ActionClient(self, GripPiece, "/gripper_manipulation/grip_piece")
 
         self.ctx = BrainContext()
         self.pipeline: List[BaseHandler] = [SenseHandler(), PlanHandler(), ExecuteHandler()]
@@ -127,11 +129,11 @@ class TaskBrain(Node):
         mode_name = UIMode.to_string(self.ctx.mode)
         self.debug(f"[tick] source={source} mode={mode_name} busy={self.ctx.busy} plan_idx={self.ctx.plan_index}/{len(self.ctx.plan)}")
         for h in self.pipeline:
-            result, reason = h.handle(self.ctx, self)
-            self.debug(f"  -> handler={h.name} result={result} reason={reason}")
-            if result == "pending" or result == "done":
+            result = h.handle(self.ctx, self)
+            self.debug(f"  -> handler={h.name} status={result.status.value} reason={result.reason}")
+            if result.status == HandlerStatus.PENDING or result.status == HandlerStatus.DONE:
                 break
-            # else "next" -> continue
+            # else HandlerStatus.NEXT -> continue
 
     # ------------- Stage: SENSE -------------
     def start_sense(self) -> bool:
@@ -190,6 +192,7 @@ class TaskBrain(Node):
         move_list: MoveList = res.plan
         self.ctx.plan = list(move_list.moves)
         self.ctx.plan_index = 0
+        self.ctx.current_phase = 0
         self.ctx.plan_received = True
         self.ctx.replan_requested = False
 
@@ -210,57 +213,175 @@ class TaskBrain(Node):
 
         move: Move = self.ctx.plan[self.ctx.plan_index]
 
-        # Try to use the MovePiece action if present; otherwise say not implemented.
+        # Execute the current phase of the 5-phase manipulation sequence
+        if self.ctx.current_phase == MovePiece.Goal.PHASE_APPROACH:
+            return self._start_approach_phase(move)
+        elif self.ctx.current_phase == MovePiece.Goal.PHASE_GRIP_OPEN:
+            return self._start_grip_open_phase(move)
+        elif self.ctx.current_phase == MovePiece.Goal.PHASE_PICK_PLACE:
+            return self._start_pick_place_phase(move)
+        elif self.ctx.current_phase == MovePiece.Goal.PHASE_GRIP_CLOSE:
+            return self._start_grip_close_phase(move)
+        elif self.ctx.current_phase == MovePiece.Goal.PHASE_RETREAT:
+            return self._start_retreat_phase(move)
+        else:
+            self.warn(f"[exec] Unknown execution phase: {self.ctx.current_phase}")
+            return False
+
+    def _start_approach_phase(self, move: Move) -> bool:
+        """Phase 1: Approach the piece"""
         if not self.move_client.wait_for_server(timeout_sec=0.2):
-            self.ui("[exec] /move_piece action server not available (not implemented yet)")
+            self.ui("[exec] /arm_manipulation/move_piece action server not available")
             return False
 
         goal = MovePiece.Goal()
         goal.move = move
-        # Optional grasp_frame if your action supports it:
-        if hasattr(goal, "grasp_frame"):
-            if move.piece.cells:
-                c0 = move.piece.cells[0]
-                goal.grasp_frame = f"grasp_c{c0.col}_r{c0.row}"
-            else:
-                goal.grasp_frame = "grasp_unknown"
+        goal.phase = MovePiece.Goal.PHASE_APPROACH
 
         self.ctx.busy = True
-        self.ui(f"[exec] Send MovePiece: type={move.piece.type} -> to=({move.to_cell.col},{move.to_cell.row})")
-        send_fut = self.move_client.send_goal_async(goal, feedback_callback=self._on_exec_feedback)
-        send_fut.add_done_callback(self._on_exec_goal_response)
+        self.ui(f"[exec] Phase 1/5: Approaching piece type={move.piece.type} at ({move.piece.cells[0].col},{move.piece.cells[0].row})")
+        send_fut = self.move_client.send_goal_async(goal, feedback_callback=self._on_move_feedback)
+        send_fut.add_done_callback(self._on_move_goal_response)
         return True
 
-    def _on_exec_goal_response(self, goal_fut: Future) -> None:
+    def _start_grip_open_phase(self, move: Move) -> bool:
+        """Phase 2: Open gripper"""
+        if not self.grip_client.wait_for_server(timeout_sec=0.2):
+            self.ui("[exec] /gripper_manipulation/grip_piece action server not available")
+            return False
+
+        goal = GripPiece.Goal()
+        goal.move = move
+        goal.grip_action = GripPiece.Goal.GRIP_OPEN
+
+        self.ctx.busy = True
+        self.ui(f"[exec] Phase 2/5: Opening gripper")
+        send_fut = self.grip_client.send_goal_async(goal, feedback_callback=self._on_grip_feedback)
+        send_fut.add_done_callback(self._on_grip_goal_response)
+        return True
+
+    def _start_pick_place_phase(self, move: Move) -> bool:
+        """Phase 3: Pick and place the piece"""
+        if not self.move_client.wait_for_server(timeout_sec=0.2):
+            self.ui("[exec] /arm_manipulation/move_piece action server not available")
+            return False
+
+        goal = MovePiece.Goal()
+        goal.phase = MovePiece.Goal.PHASE_PICK_PLACE
+
+        self.ctx.busy = True
+        self.ui(f"[exec] Phase 3/5: Pick and place to ({move.to_cell.col},{move.to_cell.row})")
+        send_fut = self.move_client.send_goal_async(goal, feedback_callback=self._on_move_feedback)
+        send_fut.add_done_callback(self._on_move_goal_response)
+        return True
+
+    def _start_grip_close_phase(self, move: Move) -> bool:
+        """Phase 4: Close gripper"""
+        if not self.grip_client.wait_for_server(timeout_sec=0.2):
+            self.ui("[exec] /gripper_manipulation/grip_piece action server not available")
+            return False
+
+        goal = GripPiece.Goal()
+        goal.move = move
+        goal.grip_action = GripPiece.Goal.GRIP_CLOSE
+
+        self.ctx.busy = True
+        self.ui(f"[exec] Phase 4/5: Closing gripper")
+        send_fut = self.grip_client.send_goal_async(goal, feedback_callback=self._on_grip_feedback)
+        send_fut.add_done_callback(self._on_grip_goal_response)
+        return True
+
+    def _start_retreat_phase(self, move: Move) -> bool:
+        """Phase 5: Retreat to home position"""
+        if not self.move_client.wait_for_server(timeout_sec=0.2):
+            self.ui("[exec] /arm_manipulation/move_piece action server not available")
+            return False
+
+        goal = MovePiece.Goal()
+        goal.move = move
+        goal.phase = MovePiece.Goal.PHASE_RETREAT
+
+        self.ctx.busy = True
+        self.ui(f"[exec] Phase 5/5: Retreating to home position")
+        send_fut = self.move_client.send_goal_async(goal, feedback_callback=self._on_move_feedback)
+        send_fut.add_done_callback(self._on_move_goal_response)
+        return True
+
+    def _on_move_goal_response(self, goal_fut: Future) -> None:
         goal_handle = goal_fut.result()
         if not goal_handle.accepted:
-            self.ui("[exec] MovePiece goal rejected")
+            self.ui(f"[exec] MovePiece phase {self.ctx.current_phase} goal rejected")
             self.ctx.busy = False
-            # Pause on rejection
             self.ctx.mode = UIMode.PAUSE
             return
-        self.debug("[exec] MovePiece accepted")
+        self.debug(f"[exec] MovePiece phase {self.ctx.current_phase} accepted")
         result_fut = goal_handle.get_result_async()
-        result_fut.add_done_callback(self._on_exec_result)
+        result_fut.add_done_callback(self._on_move_result)
 
-    def _on_exec_feedback(self, fb: MovePiece.Feedback) -> None:
-        phase = getattr(fb, "phase", "")
-        prog = getattr(fb, "progress", 0.0)
-        self.ui(f"[exec] feedback: {phase} {prog:.2f}")
+    def _on_grip_goal_response(self, goal_fut: Future) -> None:
+        goal_handle = goal_fut.result()
+        if not goal_handle.accepted:
+            self.ui(f"[exec] GripPiece phase {self.ctx.current_phase} goal rejected")
+            self.ctx.busy = False
+            self.ctx.mode = UIMode.PAUSE
+            return
+        self.debug(f"[exec] GripPiece phase {self.ctx.current_phase} accepted")
+        result_fut = goal_handle.get_result_async()
+        result_fut.add_done_callback(self._on_grip_result)
 
-    def _on_exec_result(self, res_fut: Future) -> None:
+    def _on_move_feedback(self, fb: MovePiece.Feedback) -> None:
+        phase_name = {0: "approach", 2: "pick_place", 4: "retreat"}.get(self.ctx.current_phase, "unknown")
+        self.ui(f"[exec] {phase_name} progress: {fb.progress:.2f}")
+
+    def _on_grip_feedback(self, fb: GripPiece.Feedback) -> None:
+        action_name = {1: "open", 3: "close"}.get(self.ctx.current_phase, "unknown")
+        self.ui(f"[exec] grip {action_name} progress: {fb.progress:.2f}")
+
+    def _on_move_result(self, res_fut: Future) -> None:
         try:
-            result = res_fut.result().result
-            ok = bool(getattr(result, "success", False))
-            note = getattr(result, "note", "")
+            result: MovePiece.Result = res_fut.result().result
+            ok = result.success
         except Exception as e:
             ok = False
-            note = f"exception: {e}"
+            self.warn(f"[exec] MovePiece exception: {e}")
 
         self.ctx.busy = False
         if ok:
-            self.ui(f"[exec] move OK ({note})")
+            phase_name = {0: "approach", 2: "pick_place", 4: "retreat"}.get(self.ctx.current_phase, "unknown")
+            self.ui(f"[exec] {phase_name} phase OK")
+            self._advance_to_next_phase()
+        else:
+            self.ui(f"[exec] MovePiece phase {self.ctx.current_phase} FAILED -> pause")
+            self.ctx.mode = UIMode.PAUSE
+            self.tick("exec_failed")
+
+    def _on_grip_result(self, res_fut: Future) -> None:
+        try:
+            result: GripPiece.Result = res_fut.result().result
+            ok = result.success
+        except Exception as e:
+            ok = False
+            self.warn(f"[exec] GripPiece exception: {e}")
+
+        self.ctx.busy = False
+        if ok:
+            action_name = {1: "open", 3: "close"}.get(self.ctx.current_phase, "unknown")
+            self.ui(f"[exec] grip {action_name} OK")
+            self._advance_to_next_phase()
+        else:
+            self.ui(f"[exec] GripPiece phase {self.ctx.current_phase} FAILED -> pause")
+            self.ctx.mode = UIMode.PAUSE
+            self.tick("exec_failed")
+
+    def _advance_to_next_phase(self) -> None:
+        """Advance to the next phase or complete the move"""
+        self.ctx.current_phase += 1
+
+        if self.ctx.current_phase > 4:  # All 5 phases complete
+            self.ui(f"[exec] All phases complete for move {self.ctx.plan_index + 1}/{len(self.ctx.plan)}")
             self.ctx.plan_index += 1
+            self.ctx.current_phase = 0  # Reset for next move
+
             # Continue in AUTO; pause in STEP
             if self.ctx.mode == UIMode.AUTO:
                 self.tick("exec_next_auto")
@@ -268,9 +389,12 @@ class TaskBrain(Node):
                 self.ctx.mode = UIMode.PAUSE
                 self.tick("exec_step_done")
         else:
-            self.ui(f"[exec] move FAILED ({note}) -> pause")
-            self.ctx.mode = UIMode.PAUSE
-            self.tick("exec_failed")
+            # Continue to next phase
+            if self.ctx.mode == UIMode.AUTO:
+                self.tick("exec_next_phase")
+            elif self.ctx.mode == UIMode.STEP:
+                self.ctx.mode = UIMode.PAUSE
+                self.tick("exec_phase_done")
 
 def main() -> None:
     rclpy.init()

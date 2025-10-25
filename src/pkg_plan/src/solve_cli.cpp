@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
       start = *startOpt;
       goal = *goalOpt;
     } else {
-      // Default tiny example (start == goal → 0 steps)
+      // Default tiny example (start == goal -> 0 steps)
       const std::string flat =
           "3113"
           "3113"
@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
       std::cout << "(" << c << "," << toBottomRow(r) << ")";
       if (k + 1 < m.from_cells.size()) std::cout << ",";
     }
-    std::cout << "} → " << KlotskiSolver::dirName(m.dir) << "\n";
+    std::cout << "} -> " << KlotskiSolver::dirName(m.dir) << "\n";
   }
 
   return 0;
