@@ -1,5 +1,6 @@
-uint8 MODE_AUTO=0
-uint8 MODE_STEP=1
-uint8 MODE_PAUSE=2
-uint8 MODE_RESET=3
+uint8 MODE_IDLE=0
+uint8 MODE_AUTO=1
+uint8 MODE_STEP=2
+uint8 MODE_PAUSE=3
+uint8 MODE_RESET=4
 uint8 mode

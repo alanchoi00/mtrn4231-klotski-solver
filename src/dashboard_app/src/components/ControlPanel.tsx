@@ -23,7 +23,7 @@ import React, { useEffect, useRef, useState } from "react";
 export const ControlPanel: React.FC = () => {
   const { connected, sendUICommand, subscribeEvents } = useROS();
   const [events, setEvents] = useState<string[]>([]);
-  const [mode, setMode] = useState<UIMode>(UIMode.MODE_AUTO);
+  const [mode, setMode] = useState<UIMode>(UIMode.MODE_IDLE);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

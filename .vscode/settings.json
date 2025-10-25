@@ -22,6 +22,7 @@
     ],
     "editor.formatOnType": true,
     "editor.wordBasedSuggestions": "off",
+    "editor.tabSize": 4,
     "files.saveConflictResolution": "overwriteFileOnDisk"
   },
   "editor.codeActionsOnSave": {
