@@ -51,11 +51,7 @@ class TaskBrain(Node):
         if self.goal is None:
             self._say("Please set a goal pattern first (/ui/goal). Ignoring command.")
             return
-        self._say(f"UI cmd: mode={cmd.mode} replan={cmd.replan}")
-        # If 'reset' or 'pause' etc. you can branch behaviour here.
-        if cmd.replan:
-            self.plan_queue.clear()
-            self._say("Cleared plan; will re-solve on next /board_state")
+        self._say(f"UI cmd: mode={cmd.mode}")
 
     def on_board_state(self, state: BoardState):
         if self.goal is None:
