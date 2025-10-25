@@ -13,9 +13,9 @@ class ExecutionPhase(IntEnum):
     """Execution phases for the 5-step manipulation sequence."""
 
     APPROACH = 0     # MovePiece: approach the piece
-    GRIP_OPEN = 1    # GripPiece: open gripper
+    GRIP_CLOSE = 1    # GripPiece: close gripper
     PICK_PLACE = 2   # MovePiece: pick and place piece
-    GRIP_CLOSE = 3   # GripPiece: close gripper
+    GRIP_OPEN = 3   # GripPiece: open gripper
     RETREAT = 4      # MovePiece: retreat to home position
 
     @classmethod
