@@ -25,7 +25,7 @@ static std::array<int, 5> histogram(const KlotskiSolver::Grid& g) {
   std::array<int, 5> h{};
   h.fill(0);
   for (auto v : g) {
-    if (v < 0 || v > 4) continue;
+    if (v > 4) continue;
     h[v] += 1;
   }
   return h;
