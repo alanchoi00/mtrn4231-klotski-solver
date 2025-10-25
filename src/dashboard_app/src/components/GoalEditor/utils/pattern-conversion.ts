@@ -1,6 +1,10 @@
-import type { CellMsg, PieceMsg } from "../lib/ros/types";
-import type { Block, BoardSpec, ShapeDefinition } from "../types/goal-editor";
-import { COLOR, TYPE } from "../types/goal-editor";
+import {
+  PieceColorType,
+  PieceType,
+  type CellMsg,
+  type PieceMsg,
+} from "@/lib/ros";
+import type { Block, BoardSpec, ShapeDefinition } from "../types";
 
 /**
  * Convert a Block to ROS PieceMsg format
@@ -89,10 +93,30 @@ export const parsePatternToBlocks = (
 
   // Shape definitions (top-origin coordinates)
   const SHAPE: Record<number, ShapeDefinition> = {
-    1: { w: 2, h: 2, type: TYPE._2x2, color: COLOR.RED },
-    2: { w: 2, h: 1, type: TYPE._1x2, color: COLOR.GREEN },
-    3: { w: 1, h: 2, type: TYPE._2x1, color: COLOR.BLUE },
-    4: { w: 1, h: 1, type: TYPE._1x1, color: COLOR.YELLOW },
+    [PieceType.TYPE_2_2]: {
+      w: 2,
+      h: 2,
+      type: PieceType.TYPE_2_2,
+      color: PieceColorType.COLOR_RED,
+    },
+    [PieceType.TYPE_1_2]: {
+      w: 2,
+      h: 1,
+      type: PieceType.TYPE_1_2,
+      color: PieceColorType.COLOR_GREEN,
+    },
+    [PieceType.TYPE_2_1]: {
+      w: 1,
+      h: 2,
+      type: PieceType.TYPE_2_1,
+      color: PieceColorType.COLOR_BLUE,
+    },
+    [PieceType.TYPE_1_1]: {
+      w: 1,
+      h: 1,
+      type: PieceType.TYPE_1_1,
+      color: PieceColorType.COLOR_YELLOW,
+    },
   };
 
   const blocks: Block[] = [];

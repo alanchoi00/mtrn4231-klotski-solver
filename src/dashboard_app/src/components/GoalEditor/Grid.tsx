@@ -7,8 +7,14 @@ import {
 } from "@dnd-kit/core";
 import { restrictToParentElement } from "@dnd-kit/modifiers";
 import { useMemo, type FC } from "react";
-import type { GridProps } from "../../types/goal-editor";
 import DraggableBlock from "./DraggableBlock";
+import type { Block, BoardSpec } from "./types";
+
+export interface GridProps {
+  blocks: Block[];
+  boardSpec: BoardSpec;
+  onBlockMove: (blockId: string, newCol: number, newRow: number) => void;
+}
 
 const Grid: FC<GridProps> = ({ blocks, boardSpec, onBlockMove }) => {
   const sensors = useSensors(

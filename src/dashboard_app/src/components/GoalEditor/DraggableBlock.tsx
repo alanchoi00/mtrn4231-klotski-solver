@@ -1,7 +1,12 @@
 import { useDraggable } from "@dnd-kit/core";
 import type { FC } from "react";
-import type { DraggableBlockProps } from "../../types/goal-editor";
 import { COLORS } from "./constants";
+import type { Block, BoardSpec } from "./types";
+
+export interface DraggableBlockProps {
+  block: Block;
+  boardSpec: BoardSpec;
+}
 
 const DraggableBlock: FC<DraggableBlockProps> = ({ block, boardSpec }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =

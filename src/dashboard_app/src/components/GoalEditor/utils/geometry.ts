@@ -1,4 +1,4 @@
-import type { Block, BoardSpec } from "../types/goal-editor";
+import type { Block, BoardSpec } from "../types";
 
 /**
  * Check if a block is within the board bounds
@@ -28,13 +28,19 @@ export const overlaps = (a: Block, b: Block): boolean => {
  * Check if a block collides with any other blocks in the array
  */
 export const collideAny = (block: Block, allBlocks: Block[]): boolean => {
-  return allBlocks.some((other) => other.uid !== block.uid && overlaps(block, other));
+  return allBlocks.some(
+    (other) => other.uid !== block.uid && overlaps(block, other)
+  );
 };
 
 /**
  * Create a new block with updated position
  */
-export const moveBlock = (block: Block, deltaCol: number, deltaRow: number): Block => ({
+export const moveBlock = (
+  block: Block,
+  deltaCol: number,
+  deltaRow: number
+): Block => ({
   ...block,
   col: block.col + deltaCol,
   row: block.row + deltaRow,

@@ -1,15 +1,14 @@
 "use client";
 
-import { ROSContext, type ROSContextType } from "@/lib/ros/context";
 import {
+  ROSContext,
   useROSConnection,
+  useROSPublishers,
+  useROSSubscribers,
+  type ROSContextType,
   type UseROSConnectionOptions,
-} from "@/lib/ros/useROSConnection";
-import { useROSPublishers } from "@/lib/ros/useROSPublishers";
-import { useROSSubscribers } from "@/lib/ros/useROSSubscribers";
+} from "@/lib/ros";
 import React, { useMemo } from "react";
-
-export { useROS } from "@/lib/ros/context";
 
 interface ROSProviderProps extends UseROSConnectionOptions {
   children: React.ReactNode;
@@ -27,13 +26,10 @@ export const ROSProvider: React.FC<ROSProviderProps> = ({
       ...connectionOptions,
     });
 
-  // Publisher hooks
   const { sendUICommand, sendGoalBoard } = useROSPublishers(ros, showToasts);
 
-  // Subscriber hooks
   const { subscribeEvents } = useROSSubscribers(ros);
 
-  // Context value
   const value = useMemo<ROSContextType>(
     () => ({
       ros,
@@ -59,3 +55,5 @@ export const ROSProvider: React.FC<ROSProviderProps> = ({
 
   return <ROSContext.Provider value={value}>{children}</ROSContext.Provider>;
 };
+
+export default ROSProvider;

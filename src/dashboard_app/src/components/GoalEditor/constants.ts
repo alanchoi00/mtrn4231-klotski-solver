@@ -1,7 +1,6 @@
-import type { Block, BoardSpec } from "../../types/goal-editor";
-import { COLOR, TYPE } from "../../types/goal-editor";
+import { PieceColorType, PieceType } from "@/lib/ros/types/piece.msg";
+import type { Block, BoardSpec } from "./types";
 
-// ---------- Board specification ----------
 export const BOARD_SPEC: BoardSpec = {
   cols: 4,
   rows: 5,
@@ -9,34 +8,64 @@ export const BOARD_SPEC: BoardSpec = {
   board_thickness_m: 0.02,
 };
 
-// ---------- UI Colors ----------
 export const COLORS: Record<number, string> = {
-  [COLOR.RED]: "#dc2626",
-  [COLOR.GREEN]: "#16a34a",
-  [COLOR.BLUE]: "#2563eb",
-  [COLOR.YELLOW]: "#ca8a04",
-  [COLOR.NONE]: "#6b7280",
+  [PieceColorType.COLOR_RED]: "#dc2626",
+  [PieceColorType.COLOR_GREEN]: "#16a34a",
+  [PieceColorType.COLOR_BLUE]: "#2563eb",
+  [PieceColorType.COLOR_YELLOW]: "#ca8a04",
+  [PieceColorType.COLOR_NONE]: "#6b7280",
 };
 
-// ---------- Default layout ----------
 export const DEFAULT_BLOCKS: Block[] = [
-  { uid: "u1", color: COLOR.BLUE, type: TYPE._2x1, col: 0, row: 3, w: 1, h: 2 },
-  { uid: "u2", color: COLOR.RED, type: TYPE._2x2, col: 1, row: 3, w: 2, h: 2 },
-  { uid: "u3", color: COLOR.BLUE, type: TYPE._2x1, col: 3, row: 3, w: 1, h: 2 },
+  {
+    uid: "u1",
+    color: PieceColorType.COLOR_BLUE,
+    type: PieceType.TYPE_2_1,
+    col: 0,
+    row: 3,
+    w: 1,
+    h: 2,
+  },
+  {
+    uid: "u2",
+    color: PieceColorType.COLOR_RED,
+    type: PieceType.TYPE_2_2,
+    col: 1,
+    row: 3,
+    w: 2,
+    h: 2,
+  },
+  {
+    uid: "u3",
+    color: PieceColorType.COLOR_BLUE,
+    type: PieceType.TYPE_2_1,
+    col: 3,
+    row: 3,
+    w: 1,
+    h: 2,
+  },
   {
     uid: "u4",
-    color: COLOR.GREEN,
-    type: TYPE._1x2,
+    color: PieceColorType.COLOR_GREEN,
+    type: PieceType.TYPE_1_2,
     col: 1,
     row: 2,
     w: 2,
     h: 1,
   },
-  { uid: "u5", color: COLOR.BLUE, type: TYPE._2x1, col: 0, row: 0, w: 1, h: 2 },
+  {
+    uid: "u5",
+    color: PieceColorType.COLOR_BLUE,
+    type: PieceType.TYPE_2_1,
+    col: 0,
+    row: 0,
+    w: 1,
+    h: 2,
+  },
   {
     uid: "u6",
-    color: COLOR.YELLOW,
-    type: TYPE._1x1,
+    color: PieceColorType.COLOR_YELLOW,
+    type: PieceType.TYPE_1_1,
     col: 1,
     row: 1,
     w: 1,
@@ -44,18 +73,26 @@ export const DEFAULT_BLOCKS: Block[] = [
   },
   {
     uid: "u7",
-    color: COLOR.YELLOW,
-    type: TYPE._1x1,
+    color: PieceColorType.COLOR_YELLOW,
+    type: PieceType.TYPE_1_1,
     col: 2,
     row: 1,
     w: 1,
     h: 1,
   },
-  { uid: "u8", color: COLOR.BLUE, type: TYPE._2x1, col: 3, row: 0, w: 1, h: 2 },
+  {
+    uid: "u8",
+    color: PieceColorType.COLOR_BLUE,
+    type: PieceType.TYPE_2_1,
+    col: 3,
+    row: 0,
+    w: 1,
+    h: 2,
+  },
   {
     uid: "u9",
-    color: COLOR.YELLOW,
-    type: TYPE._1x1,
+    color: PieceColorType.COLOR_YELLOW,
+    type: PieceType.TYPE_1_1,
     col: 1,
     row: 0,
     w: 1,
@@ -63,8 +100,8 @@ export const DEFAULT_BLOCKS: Block[] = [
   },
   {
     uid: "u10",
-    color: COLOR.YELLOW,
-    type: TYPE._1x1,
+    color: PieceColorType.COLOR_YELLOW,
+    type: PieceType.TYPE_1_1,
     col: 2,
     row: 0,
     w: 1,
@@ -72,5 +109,4 @@ export const DEFAULT_BLOCKS: Block[] = [
   },
 ];
 
-// ---------- Data URLs ----------
 export const PATTERNS_DATA_URL = "/data/possible_combinations.json";
