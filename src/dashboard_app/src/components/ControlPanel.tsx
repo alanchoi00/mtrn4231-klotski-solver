@@ -17,7 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UIMode, useROS } from "@/lib/ros";
-import { Pause, Play, RefreshCw, RotateCcw, SkipForward } from "lucide-react";
+import { Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
 export const ControlPanel: React.FC = () => {
@@ -44,9 +44,9 @@ export const ControlPanel: React.FC = () => {
     }
   }, [events]);
 
-  const pushCmd = (m: UIMode, replan = false) => {
+  const pushCmd = (m: UIMode) => {
     setMode(m);
-    sendUICommand(m, replan);
+    sendUICommand(m);
   };
 
   return (
@@ -120,20 +120,6 @@ export const ControlPanel: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent>
                 Reset brain state (no hardware reset)
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => pushCmd(UIMode.MODE_STEP, true)}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" /> Replan
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Flush current plan and request a new one
               </TooltipContent>
             </Tooltip>
           </div>

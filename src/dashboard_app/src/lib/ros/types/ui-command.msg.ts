@@ -7,5 +7,4 @@ export enum UIMode {
 
 export interface UICommandMsg {
   mode: UIMode;
-  replan: boolean;
 }

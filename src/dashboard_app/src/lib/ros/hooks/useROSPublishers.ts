@@ -3,10 +3,11 @@ import { BoardMsg, UICommandMsg, UIMode } from "@/lib/ros/types";
 import { useCallback } from "react";
 import ROSLIB, { type Ros } from "roslib";
 import { toast } from "sonner";
+import { boardToPattern } from "../utils";
 
 export const useROSPublishers = (ros?: Ros, showToasts = true) => {
   const sendUICommand = useCallback(
-    (mode: UIMode, replan = false) => {
+    (mode: UIMode) => {
       if (!ros) {
         if (showToasts) {
           toast.error("Cannot send command", {
@@ -23,15 +24,10 @@ export const useROSPublishers = (ros?: Ros, showToasts = true) => {
           messageType: "klotski_interfaces/msg/UICommand",
         });
 
-        const msg: UICommandMsg = { mode, replan };
+        const msg: UICommandMsg = { mode };
         pub.publish(new ROSLIB.Message(msg));
-
-        if (showToasts) {
-          toast.success(`Command sent: ${UIMode[mode]}`, {
-            description: replan ? "Replanning requested" : undefined,
-          });
-        }
-        console.log(`UI command sent: ${UIMode[mode]}, replan: ${replan}`);
+        toast.success(`Command sent: ${UIMode[mode]}`);
+        console.log(`UI command sent: ${UIMode[mode]}`);
       } catch (error) {
         console.error("Failed to send UI command:", error);
         if (showToasts) {
@@ -65,15 +61,18 @@ export const useROSPublishers = (ros?: Ros, showToasts = true) => {
 
         pub.publish(new ROSLIB.Message(goal));
 
+        const pattern = boardToPattern(goal);
+
         if (showToasts) {
           toast.success("Goal pattern set!", {
-            description: `${goal.pieces.length} pieces on ${goal.spec.cols}×${goal.spec.rows} board`,
+            description: `Pattern: ${pattern}`,
           });
         }
 
         console.log("Goal board sent:", {
           spec: goal.spec,
           pieceCount: goal.pieces.length,
+          pattern,
         });
       } catch (error) {
         console.error("Failed to send goal board:", error);

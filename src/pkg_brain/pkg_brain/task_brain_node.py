@@ -71,7 +71,36 @@ class TaskBrain(Node):
 
     def on_goal(self, msg: Board):
         self.goal = msg
-        self._say(f"Goal received: {len(msg.pieces)} pieces for {msg.spec.cols}x{msg.spec.rows}")
+        pattern = self._board_to_pattern(msg)
+        self._say(f"Goal received: {len(msg.pieces)} pieces for {msg.spec.cols}x{msg.spec.rows}, pattern: {pattern}")
+
+    def _board_to_pattern(self, board: Board) -> str:
+        """Convert a Board message to a pattern string for display"""
+        W = board.spec.cols
+        H = board.spec.rows
+
+        # Create top-origin grid of digits (0 = empty)
+        grid = [[0 for _ in range(W)] for _ in range(H)]
+
+        # Fill grid with piece types at their cell positions
+        for piece in board.pieces:
+            for cell in piece.cells:
+                col, row = cell.col, cell.row
+
+                # Convert bottom-left origin (ROS) to top-origin (pattern display)
+                top_row = H - 1 - row
+                left_col = col
+
+                if 0 <= top_row < H and 0 <= left_col < W:
+                    grid[top_row][left_col] = piece.type
+
+        # Flatten to string (row-major, top row first)
+        result = ""
+        for r in range(H):
+            for c in range(W):
+                result += str(grid[r][c])
+
+        return result
 
     # ----- solver callback -----
     def _after_solve(self, fut):
