@@ -36,8 +36,11 @@ class ExecuteHandler(BaseHandler):
             else:
                 node.ui("[exec] manipulation not implemented; skipping phase")
                 # emulate "done one phase" even if not implemented:
-                ctx.current_phase = ExecutionPhase(ctx.current_phase + 1)
-                if ctx.current_phase > ExecutionPhase.RETREAT:
+                next_phase = ExecutionPhase.next_phase(ctx.current_phase)
+                if next_phase is not None:
+                    ctx.current_phase = next_phase
+                else:
+                    # All phases complete for this move
                     ctx.plan_index += 1
                     ctx.current_phase = ExecutionPhase.APPROACH
                 ctx.mode = UIMode.PAUSE

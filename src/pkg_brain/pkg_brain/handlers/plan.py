@@ -17,8 +17,7 @@ class PlanHandler(BaseHandler):
         if ctx.sensed is None:
             return HandlerResult(HandlerStatus.NEXT, "sense first")
 
-        need_plan = ctx.replan_requested or (not ctx.plan_received)
-        if not need_plan:
+        if ctx.plan_received:
             return HandlerResult(HandlerStatus.NEXT, "have plan")
 
         node.debug("[plan] Request plan from /plan/solve")

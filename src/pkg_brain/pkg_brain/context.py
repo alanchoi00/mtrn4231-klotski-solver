@@ -39,6 +39,18 @@ class ExecutionPhase(IntEnum):
     def is_move_phase(cls, phase: int) -> bool:
         """Check if phase is an arm movement operation."""
         return phase in (cls.APPROACH, cls.PICK_PLACE, cls.RETREAT)
+    
+    @classmethod
+    def is_last_phase(cls, phase: int) -> bool:
+        """Check if this is the last phase in the sequence."""
+        return phase == cls.RETREAT
+    
+    @classmethod
+    def next_phase(cls, current_phase: int) -> 'ExecutionPhase | None':
+        """Get next phase safely, returns None if already at last phase."""
+        if current_phase >= cls.RETREAT:
+            return None
+        return cls(current_phase + 1)
 
 
 @dataclass
@@ -57,7 +69,6 @@ class BrainContext:
 
     # Execution flags
     busy: bool = False           # currently sending action
-    replan_requested: bool = False  # flag from UI "replan" or after sense
     current_phase: ExecutionPhase = ExecutionPhase.APPROACH  # current execution phase
 
     # Book-keeping
@@ -70,7 +81,6 @@ class BrainContext:
         self.plan_index = 0
         self.plan_received = False
         self.busy = False
-        self.replan_requested = False
         self.current_phase = ExecutionPhase.APPROACH
         self.last_error = ""
         self.mode = UIMode.PAUSE     # after reset, remain paused
