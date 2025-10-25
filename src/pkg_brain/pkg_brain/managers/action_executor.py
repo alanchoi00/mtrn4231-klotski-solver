@@ -36,12 +36,12 @@ class ActionExecutor:
         # Execute the current phase of the 5-phase manipulation sequence
         if brain.ctx.current_phase == ExecutionPhase.APPROACH:
             return self._start_approach_phase(move)
-        elif brain.ctx.current_phase == ExecutionPhase.GRIP_OPEN:
-            return self._start_grip_open_phase(move)
+        elif brain.ctx.current_phase == ExecutionPhase.GRIP_CLOSE:
+            return self._start_grip_close_phase()
         elif brain.ctx.current_phase == ExecutionPhase.PICK_PLACE:
             return self._start_pick_place_phase(move)
-        elif brain.ctx.current_phase == ExecutionPhase.GRIP_CLOSE:
-            return self._start_grip_close_phase(move)
+        elif brain.ctx.current_phase == ExecutionPhase.GRIP_OPEN:
+            return self._start_grip_open_phase()
         elif brain.ctx.current_phase == ExecutionPhase.RETREAT:
             return self._start_retreat_phase(move)
         else:
@@ -64,14 +64,13 @@ class ActionExecutor:
         send_fut.add_done_callback(self._on_move_goal_response)
         return True
 
-    def _start_grip_open_phase(self, move: Move) -> bool:
+    def _start_grip_open_phase(self) -> bool:
         """Phase 2: Open gripper."""
         if not self.grip_client.wait_for_server(timeout_sec=0.2):
             self._ui("[exec] /gripper_manipulation/grip_piece action server not available")
             return False
 
         goal = GripPiece.Goal()
-        goal.move = move
         goal.grip_action = GripPiece.Goal.GRIP_OPEN
 
         self._set_busy(True)
@@ -95,14 +94,13 @@ class ActionExecutor:
         send_fut.add_done_callback(self._on_move_goal_response)
         return True
 
-    def _start_grip_close_phase(self, move: Move) -> bool:
+    def _start_grip_close_phase(self) -> bool:
         """Phase 4: Close gripper."""
         if not self.grip_client.wait_for_server(timeout_sec=0.2):
             self._ui("[exec] /gripper_manipulation/grip_piece action server not available")
             return False
 
         goal = GripPiece.Goal()
-        goal.move = move
         goal.grip_action = GripPiece.Goal.GRIP_CLOSE
 
         self._set_busy(True)
