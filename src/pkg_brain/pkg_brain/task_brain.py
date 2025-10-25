@@ -20,7 +20,7 @@ from .ui_modes import UIMode
 class TaskBrain(Node):
     """
     Brain node with a Chain-of-Responsibility pipeline:
-      Sense → Plan → Execute
+      Sense -> Plan -> Execute
     Modes from UICommand: MODE_AUTO, MODE_STEP, MODE_PAUSE, MODE_RESET
     """
 
@@ -62,7 +62,7 @@ class TaskBrain(Node):
         mode = (cmd.mode or UIMode.IDLE)
         if UIMode.is_valid(mode):
             if mode == UIMode.RESET:
-                self.ui("UI: reset → pause + clear memory")
+                self.ui("UI: reset -> pause + clear memory")
                 self.ctx.reset()
             elif mode == UIMode.PAUSE:
                 self.ui("UI: pause")
@@ -116,7 +116,7 @@ class TaskBrain(Node):
     def on_board_state(self, state: BoardState) -> None:
         self.ctx.sensed = state
         self.ui(f"BoardState received: {len(state.board.pieces)} pieces")
-        # sensing updated → replan
+        # sensing updated -> replan
         self.ctx.replan_requested = True
         self.ctx.plan_received = False  # invalidate old plan
         self.tick("board_state")
@@ -131,7 +131,7 @@ class TaskBrain(Node):
             self.debug(f"  -> handler={h.name} result={result} reason={reason}")
             if result == "pending" or result == "done":
                 break
-            # else "next" → continue
+            # else "next" -> continue
 
     # ------------- Stage: SENSE -------------
     def start_sense(self) -> bool:
@@ -226,7 +226,7 @@ class TaskBrain(Node):
                 goal.grasp_frame = "grasp_unknown"
 
         self.ctx.busy = True
-        self.ui(f"[exec] Send MovePiece: type={move.piece.type} → to=({move.to_cell.col},{move.to_cell.row})")
+        self.ui(f"[exec] Send MovePiece: type={move.piece.type} -> to=({move.to_cell.col},{move.to_cell.row})")
         send_fut = self.move_client.send_goal_async(goal, feedback_callback=self._on_exec_feedback)
         send_fut.add_done_callback(self._on_exec_goal_response)
         return True
@@ -268,7 +268,7 @@ class TaskBrain(Node):
                 self.ctx.mode = UIMode.PAUSE
                 self.tick("exec_step_done")
         else:
-            self.ui(f"[exec] move FAILED ({note}) → pause")
+            self.ui(f"[exec] move FAILED ({note}) -> pause")
             self.ctx.mode = UIMode.PAUSE
             self.tick("exec_failed")
 
