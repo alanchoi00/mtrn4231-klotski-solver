@@ -12,7 +12,7 @@ from klotski_interfaces.action import GripPiece, MovePiece
 from klotski_interfaces.msg import Board, BoardState, Move, MoveList, UICommand
 from klotski_interfaces.srv import CaptureBoard, SolveBoard
 
-from .context import BrainContext
+from .context import BrainContext, ExecutionPhase
 from .handlers import (BaseHandler, ExecuteHandler, HandlerStatus, PlanHandler,
                        SenseHandler)
 from .ui_modes import UIMode
@@ -192,7 +192,7 @@ class TaskBrain(Node):
         move_list: MoveList = res.plan
         self.ctx.plan = list(move_list.moves)
         self.ctx.plan_index = 0
-        self.ctx.current_phase = 0
+        self.ctx.current_phase = ExecutionPhase.APPROACH  # Reset to first phase
         self.ctx.plan_received = True
         self.ctx.replan_requested = False
 
@@ -214,18 +214,18 @@ class TaskBrain(Node):
         move: Move = self.ctx.plan[self.ctx.plan_index]
 
         # Execute the current phase of the 5-phase manipulation sequence
-        if self.ctx.current_phase == MovePiece.Goal.PHASE_APPROACH:
+        if self.ctx.current_phase == ExecutionPhase.APPROACH:
             return self._start_approach_phase(move)
-        elif self.ctx.current_phase == MovePiece.Goal.PHASE_GRIP_OPEN:
+        elif self.ctx.current_phase == ExecutionPhase.GRIP_OPEN:
             return self._start_grip_open_phase(move)
-        elif self.ctx.current_phase == MovePiece.Goal.PHASE_PICK_PLACE:
+        elif self.ctx.current_phase == ExecutionPhase.PICK_PLACE:
             return self._start_pick_place_phase(move)
-        elif self.ctx.current_phase == MovePiece.Goal.PHASE_GRIP_CLOSE:
+        elif self.ctx.current_phase == ExecutionPhase.GRIP_CLOSE:
             return self._start_grip_close_phase(move)
-        elif self.ctx.current_phase == MovePiece.Goal.PHASE_RETREAT:
+        elif self.ctx.current_phase == ExecutionPhase.RETREAT:
             return self._start_retreat_phase(move)
         else:
-            self.warn(f"[exec] Unknown execution phase: {self.ctx.current_phase}")
+            self.warn(f"[exec] Unknown execution phase: {ExecutionPhase.get_name(self.ctx.current_phase)}")
             return False
 
     def _start_approach_phase(self, move: Move) -> bool:
@@ -330,12 +330,12 @@ class TaskBrain(Node):
         result_fut.add_done_callback(self._on_grip_result)
 
     def _on_move_feedback(self, fb: MovePiece.Feedback) -> None:
-        phase_name = {0: "approach", 2: "pick_place", 4: "retreat"}.get(self.ctx.current_phase, "unknown")
+        phase_name = ExecutionPhase.get_name(self.ctx.current_phase)
         self.ui(f"[exec] {phase_name} progress: {fb.progress:.2f}")
 
     def _on_grip_feedback(self, fb: GripPiece.Feedback) -> None:
-        action_name = {1: "open", 3: "close"}.get(self.ctx.current_phase, "unknown")
-        self.ui(f"[exec] grip {action_name} progress: {fb.progress:.2f}")
+        phase_name = ExecutionPhase.get_name(self.ctx.current_phase)
+        self.ui(f"[exec] {phase_name} progress: {fb.progress:.2f}")
 
     def _on_move_result(self, res_fut: Future) -> None:
         try:
@@ -347,11 +347,12 @@ class TaskBrain(Node):
 
         self.ctx.busy = False
         if ok:
-            phase_name = {0: "approach", 2: "pick_place", 4: "retreat"}.get(self.ctx.current_phase, "unknown")
+            phase_name = ExecutionPhase.get_name(self.ctx.current_phase)
             self.ui(f"[exec] {phase_name} phase OK")
             self._advance_to_next_phase()
         else:
-            self.ui(f"[exec] MovePiece phase {self.ctx.current_phase} FAILED -> pause")
+            phase_name = ExecutionPhase.get_name(self.ctx.current_phase)
+            self.ui(f"[exec] MovePiece {phase_name} FAILED -> pause")
             self.ctx.mode = UIMode.PAUSE
             self.tick("exec_failed")
 
@@ -365,22 +366,23 @@ class TaskBrain(Node):
 
         self.ctx.busy = False
         if ok:
-            action_name = {1: "open", 3: "close"}.get(self.ctx.current_phase, "unknown")
-            self.ui(f"[exec] grip {action_name} OK")
+            phase_name = ExecutionPhase.get_name(self.ctx.current_phase)
+            self.ui(f"[exec] {phase_name} OK")
             self._advance_to_next_phase()
         else:
-            self.ui(f"[exec] GripPiece phase {self.ctx.current_phase} FAILED -> pause")
+            phase_name = ExecutionPhase.get_name(self.ctx.current_phase)
+            self.ui(f"[exec] GripPiece {phase_name} FAILED -> pause")
             self.ctx.mode = UIMode.PAUSE
             self.tick("exec_failed")
 
     def _advance_to_next_phase(self) -> None:
         """Advance to the next phase or complete the move"""
-        self.ctx.current_phase += 1
+        self.ctx.current_phase = ExecutionPhase(self.ctx.current_phase + 1)
 
-        if self.ctx.current_phase > 4:  # All 5 phases complete
+        if self.ctx.current_phase > ExecutionPhase.RETREAT:  # All 5 phases complete
             self.ui(f"[exec] All phases complete for move {self.ctx.plan_index + 1}/{len(self.ctx.plan)}")
             self.ctx.plan_index += 1
-            self.ctx.current_phase = 0  # Reset for next move
+            self.ctx.current_phase = ExecutionPhase.APPROACH  # Reset for next move
 
             # Continue in AUTO; pause in STEP
             if self.ctx.mode == UIMode.AUTO:

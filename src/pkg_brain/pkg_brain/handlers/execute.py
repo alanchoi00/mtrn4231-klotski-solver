@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..context import BrainContext
+from ..context import BrainContext, ExecutionPhase
 from ..ui_modes import UIMode
 from .base import BaseHandler, BrainNodeLike, HandlerResult
 from .status import HandlerResult, HandlerStatus
@@ -29,25 +29,23 @@ class ExecuteHandler(BaseHandler):
 
         # STEP mode: run exactly one phase and then pause
         if ctx.mode == UIMode.STEP:
-            phase_names = ["approach", "grip_open", "pick_place", "grip_close", "retreat"]
-            current_phase_name = phase_names[ctx.current_phase] if ctx.current_phase < 5 else "unknown"
+            current_phase_name = ExecutionPhase.get_name(ctx.current_phase)
             node.debug(f"[exec] STEP: executing {current_phase_name} phase")
             if node.start_execute_next_move():
                 return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
             else:
                 node.ui("[exec] manipulation not implemented; skipping phase")
                 # emulate "done one phase" even if not implemented:
-                ctx.current_phase += 1
-                if ctx.current_phase > 4:
+                ctx.current_phase = ExecutionPhase(ctx.current_phase + 1)
+                if ctx.current_phase > ExecutionPhase.RETREAT:
                     ctx.plan_index += 1
-                    ctx.current_phase = 0
+                    ctx.current_phase = ExecutionPhase.APPROACH
                 ctx.mode = UIMode.PAUSE
                 return HandlerResult(HandlerStatus.DONE, "skipped one phase (not implemented)")
 
         # AUTO mode: run next phase; result callback will trigger next tick
         if ctx.mode == UIMode.AUTO:
-            phase_names = ["approach", "grip_open", "pick_place", "grip_close", "retreat"]
-            current_phase_name = phase_names[ctx.current_phase] if ctx.current_phase < 5 else "unknown"
+            current_phase_name = ExecutionPhase.get_name(ctx.current_phase)
             node.debug(f"[exec] AUTO: executing {current_phase_name} phase")
             if node.start_execute_next_move():
                 return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
