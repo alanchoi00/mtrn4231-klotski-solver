@@ -1,9 +1,14 @@
 # Goal
 klotski_interfaces/Move move
+
+uint8 PHASE_IDLE=0
+uint8 PHASE_APPROACH=1
+uint8 PHASE_PICK_PLACE=2
+uint8 PHASE_RETREAT=3
+uint8 phase
 ---
 # Result
 bool success
 ---
 # Feedback
-string phase                    # "approach"|"lift"|"slide"|"place"|"retreat"
 float32 progress                # 0..1 for current phase completion

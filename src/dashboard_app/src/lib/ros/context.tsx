@@ -8,7 +8,7 @@ export interface ROSContextType {
   connected: boolean;
   connecting: boolean;
   retryCount: number;
-  sendUICommand: (mode: UIMode, replan?: boolean) => void;
+  sendUICommand: (mode: UIMode) => void;
   sendGoalBoard: (goal: BoardMsg) => void;
   subscribeEvents: (onMsg: (m: RosStringMsg) => void) => () => void;
   reconnect: () => void;

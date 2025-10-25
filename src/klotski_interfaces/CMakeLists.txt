@@ -24,7 +24,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ContactState.msg"
   "srv/SolveBoard.srv"
   "action/MovePiece.action"
-  # "action/GripPiece.action"
+  "srv/CaptureBoard.srv"
+  "action/GripPiece.action"
   DEPENDENCIES geometry_msgs builtin_interfaces
 )
 
