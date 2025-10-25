@@ -1,3 +1,4 @@
+# !! for mock sense node only !!
 ---
 klotski_interfaces/BoardState state
 bool ok
