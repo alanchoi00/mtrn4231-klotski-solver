@@ -23,24 +23,27 @@ class TaskBrain(Node):
         - Emit progress via /ui/events
     Robust to missing solver/action (logs and waits).
     """
+
     def __init__(self):
-        super().__init__('task_brain')
+        super().__init__("task_brain")
 
         # Params
-        self.declare_parameter('auto_continue', True)
-        self.declare_parameter('relocalise_between_moves', True)
-        self.auto_continue = self.get_parameter('auto_continue').get_parameter_value().bool_value
+        self.declare_parameter("auto_continue", True)
+        self.declare_parameter("relocalise_between_moves", True)
+        self.auto_continue = (
+            self.get_parameter("auto_continue").get_parameter_value().bool_value
+        )
 
         # IO
-        self.create_subscription(UICommand, '/ui/cmd', self.on_ui_cmd, 10)
-        self.create_subscription(BoardState, '/board_state', self.on_board_state, 10)
-        self.ui_pub = self.create_publisher(String, '/ui/events', 10)
-        self.create_subscription(Board, '/ui/goal', self.on_goal, 10)
+        self.create_subscription(UICommand, "/ui/cmd", self.on_ui_cmd, 10)
+        self.create_subscription(BoardState, "/board_state", self.on_board_state, 10)
+        self.ui_pub = self.create_publisher(String, "/ui/events", 10)
+        self.create_subscription(Board, "/ui/goal", self.on_goal, 10)
         self.goal: Optional[Board] = None
 
         # Clients
-        self.solve_cli = self.create_client(SolveBoard, '/plan/solve')
-        self.move_client = ActionClient(self, MovePiece, '/move_piece')
+        self.solve_cli = self.create_client(SolveBoard, "/plan/solve")
+        self.move_client = ActionClient(self, MovePiece, "/move_piece")
 
         self.plan_queue = []
         self.busy = False
@@ -62,7 +65,9 @@ class TaskBrain(Node):
             self._say("Waiting for /plan/solve service...")
             return
 
-        self._say(f"BoardState received with {len(state.pieces)} piece(s); requesting plan...")
+        self._say(
+            f"BoardState received with {len(state.pieces)} piece(s); requesting plan..."
+        )
         req = SolveBoard.Request()
         req.state = state
         req.goal = self.goal
@@ -72,7 +77,9 @@ class TaskBrain(Node):
     def on_goal(self, msg: Board):
         self.goal = msg
         pattern = self._board_to_pattern(msg)
-        self._say(f"Goal received: {len(msg.pieces)} pieces for {msg.spec.cols}x{msg.spec.rows}, pattern: {pattern}")
+        self._say(
+            f"Goal received: {len(msg.pieces)} pieces for {msg.spec.cols}x{msg.spec.rows}, pattern: {pattern}"
+        )
 
     def _board_to_pattern(self, board: Board) -> str:
         """Convert a Board message to a pattern string for display"""
@@ -112,7 +119,9 @@ class TaskBrain(Node):
 
         moves: MoveList = res.plan
         self.plan_queue = list(moves.moves) if moves else []
-        self._say(f"Plan: {len(self.plan_queue)} move(s). Solved={res.solved} note={res.note}")
+        self._say(
+            f"Plan: {len(self.plan_queue)} move(s). Solved={res.solved} note={res.note}"
+        )
 
         if self.plan_queue and not self.busy:
             self._send_next_move()
@@ -132,9 +141,13 @@ class TaskBrain(Node):
         goal.grasp_frame = f"grasp_{move.piece_id}"
 
         self.busy = True
-        self._say(f"Sending move: {move.piece_id} {move.direction} dx={move.dx:.3f} dy={move.dy:.3f}")
+        self._say(
+            f"Sending move: {move.piece_id} {move.direction} dx={move.dx:.3f} dy={move.dy:.3f}"
+        )
 
-        send_future = self.move_client.send_goal_async(goal, feedback_callback=self._on_fb)
+        send_future = self.move_client.send_goal_async(
+            goal, feedback_callback=self._on_fb
+        )
         send_future.add_done_callback(self._on_goal_response)
 
     def _on_goal_response(self, goal_future):
@@ -166,6 +179,7 @@ class TaskBrain(Node):
     def _say(self, text: str):
         self.ui_pub.publish(String(data=text))
         self.get_logger().info(text)
+
 
 def main():
     rclpy.init()
