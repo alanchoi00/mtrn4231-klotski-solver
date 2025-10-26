@@ -179,12 +179,12 @@ private:
   {
     geometry_msgs::msg::Pose pose;
 
-    float cellSize = 0.1;
+    float cellSize = 0.050;
 
     // I hardcore the palce of the board in base_link coordinate
-    float boardOriginX = 0.5;
-    float boardOriginY = 0.3;
-    float boardHeight = 0.15;
+    float boardOriginX = 0.250;
+    float boardOriginY = 0.200;
+    float boardHeight = 0.080;
 
     pose.position.x = boardOriginX + cell.col * cellSize;
     pose.position.y = boardOriginY + cell.row * cellSize;
