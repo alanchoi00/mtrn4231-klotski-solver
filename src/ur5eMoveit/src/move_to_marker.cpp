@@ -184,7 +184,7 @@ private:
     // I hardcore the palce of the board in base_link coordinate
     float boardOriginX = 0.250;
     float boardOriginY = 0.200;
-    float boardHeight = 0.080;
+    float boardHeight = 0.0800;
 
     pose.position.x = boardOriginX + cell.col * cellSize;
     pose.position.y = boardOriginY + cell.row * cellSize;
