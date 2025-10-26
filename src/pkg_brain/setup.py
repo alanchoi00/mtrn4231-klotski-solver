@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'task_brain = pkg_brain.task_brain_node:main',
+            'task_brain = pkg_brain.task_brain:main',
         ],
     },
 )

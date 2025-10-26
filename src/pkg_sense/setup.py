@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'mock_sense = pkg_sense.mock_sense_node:main',
         ],
     },
 )
