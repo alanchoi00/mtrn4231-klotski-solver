@@ -22,8 +22,8 @@ setup(
     entry_points={
         'console_scripts': [
             'gripper_action_server = pkg_manipulation.grip_manip:main',
-            'test_gripper_client = scripts.test_gripper_client:main',
-            'manual_gripper_control = scripts.manual_gripper_control:main',
+            'test_gripper_client = pkg_manipulation.test_gripper_client:main',
+            'manual_gripper_control = pkg_manipulation.manual_gripper_control:main',
         ],
     },
 )

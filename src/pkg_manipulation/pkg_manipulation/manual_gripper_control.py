@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Manual gripper control tool for testing
-Usage: 
+Usage:
   ros2 run pkg_manipulation manual_gripper_control open
   ros2 run pkg_manipulation manual_gripper_control close
 """
@@ -20,7 +20,7 @@ class ManualGripperControl(Node):
     def __init__(self):
         super().__init__('manual_gripper_control')
         self._action_client = ActionClient(self, GripPiece, '/gripper_manipulation/grip_piece')
-        
+
     def control_gripper(self, action_str):
         """Send gripper command based on string input"""
         if action_str.lower() == 'open':
@@ -32,37 +32,37 @@ class ManualGripperControl(Node):
         else:
             self.get_logger().error(f"Invalid action: {action_str}. Use 'open' or 'close'")
             return False
-            
+
         self.get_logger().info(f'Sending gripper {action_name} command...')
-        
+
         # Wait for action server
         if not self._action_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error('Gripper action server not available!')
             return False
-            
+
         # Create and send goal
         goal_msg = GripPiece.Goal()
         goal_msg.grip_action = grip_action
-        
+
         future = self._action_client.send_goal_async(
             goal_msg,
             feedback_callback=self.feedback_callback
         )
-        
+
         # Wait for goal to be accepted
         rclpy.spin_until_future_complete(self, future)
-        
+
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error('Goal rejected by server')
             return False
 
         self.get_logger().info('Goal accepted, waiting for result...')
-        
+
         # Wait for result
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future)
-        
+
         result = result_future.result().result
         if result.success:
             self.get_logger().info(f'Gripper {action_name} completed successfully!')
@@ -91,11 +91,11 @@ def main():
         return
 
     action = sys.argv[1]
-    
+
     rclpy.init()
-    
+
     controller = ManualGripperControl()
-    
+
     try:
         success = controller.control_gripper(action)
         if success:
