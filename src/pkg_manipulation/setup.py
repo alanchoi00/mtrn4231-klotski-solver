@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/test_gripper.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,6 +21,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'gripper_action_server = pkg_manipulation.grip_manip:main',
+            'test_gripper_client = scripts.test_gripper_client:main',
+            'manual_gripper_control = scripts.manual_gripper_control:main',
         ],
     },
 )
