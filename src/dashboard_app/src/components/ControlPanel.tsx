@@ -16,15 +16,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { UIMode } from "@/lib/ros/types";
-import { Pause, Play, RefreshCw, RotateCcw, SkipForward } from "lucide-react";
+import { UIMode, useROS } from "@/lib/ros";
+import { Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { useROS } from "./ROSProvider";
 
 export const ControlPanel: React.FC = () => {
   const { connected, sendUICommand, subscribeEvents } = useROS();
   const [events, setEvents] = useState<string[]>([]);
-  const [mode, setMode] = useState<UIMode>("step");
+  const [mode, setMode] = useState<UIMode>(UIMode.MODE_IDLE);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,9 +44,9 @@ export const ControlPanel: React.FC = () => {
     }
   }, [events]);
 
-  const pushCmd = (m: UIMode, replan = false) => {
+  const pushCmd = (m: UIMode) => {
     setMode(m);
-    sendUICommand(m, replan);
+    sendUICommand(m);
   };
 
   return (
@@ -75,8 +74,8 @@ export const ControlPanel: React.FC = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={mode === "auto" ? "default" : "outline"}
-                  onClick={() => pushCmd("auto")}
+                  variant={mode === UIMode.MODE_AUTO ? "default" : "outline"}
+                  onClick={() => pushCmd(UIMode.MODE_AUTO)}
                 >
                   <Play className="mr-2 h-4 w-4" /> Auto
                 </Button>
@@ -87,8 +86,8 @@ export const ControlPanel: React.FC = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={mode === "step" ? "default" : "outline"}
-                  onClick={() => pushCmd("step")}
+                  variant={mode === UIMode.MODE_STEP ? "default" : "outline"}
+                  onClick={() => pushCmd(UIMode.MODE_STEP)}
                 >
                   <SkipForward className="mr-2 h-4 w-4" /> Step
                 </Button>
@@ -99,8 +98,8 @@ export const ControlPanel: React.FC = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={mode === "pause" ? "default" : "outline"}
-                  onClick={() => pushCmd("pause")}
+                  variant={mode === UIMode.MODE_PAUSED ? "default" : "outline"}
+                  onClick={() => pushCmd(UIMode.MODE_PAUSED)}
                 >
                   <Pause className="mr-2 h-4 w-4" /> Pause
                 </Button>
@@ -112,23 +111,15 @@ export const ControlPanel: React.FC = () => {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" onClick={() => pushCmd("reset")}>
+                <Button
+                  variant="outline"
+                  onClick={() => pushCmd(UIMode.MODE_RESET)}
+                >
                   <RotateCcw className="mr-2 h-4 w-4" /> Reset
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
                 Reset brain state (no hardware reset)
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" onClick={() => pushCmd("step", true)}>
-                  <RefreshCw className="mr-2 h-4 w-4" /> Replan
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Flush current plan and request a new one
               </TooltipContent>
             </Tooltip>
           </div>

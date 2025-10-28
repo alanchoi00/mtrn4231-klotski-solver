@@ -1,1 +1,10 @@
-# TODO: implement grip action
+# Goal
+uint8 GRIP_OPEN=0
+uint8 GRIP_CLOSE=1
+uint8 grip_action
+---
+# Result
+bool success
+---
+# Feedback
+float32 progress                # 0..1 for grip completion

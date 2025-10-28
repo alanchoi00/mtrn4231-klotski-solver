@@ -79,11 +79,11 @@ npm install
 
 ```bash
 # Launch core ROS nodes
-ros2 launch launch/demo.launch.py
+ros2 launch launch/klotski.launch.py
 
 # Or launch individually:
-ros2 run pkg_brain task_brain        # Task orchestrator
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml  # Web bridge
+ros2 run pkg_brain task_brain # Task orchestrator
+ros2 launch rosbridge_server # ROS bridge
 ```
 
 #### Terminal 2: Camera (if using USB camera)
