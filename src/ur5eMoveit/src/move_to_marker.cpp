@@ -69,6 +69,15 @@ public:
   }
 
 private:
+  // constant value
+  const double BOARD_HEIGHT = 0.008;   // 板子高度 8mm
+  const double BLOCK_HEIGHT = 0.015;   // 方块高度 15mm
+  const double GRIPPER_HEIGHT = 0.191; // 夹爪高度 191mm
+
+  const double APPROACH_HEIGHT = 0.1 + GRIPPER_HEIGHT + BOARD_HEIGHT + BLOCK_HEIGHT;  // 0.314m
+  const double GRIP_HEIGHT = GRIPPER_HEIGHT + BOARD_HEIGHT + BLOCK_HEIGHT;            // 0.214m
+  const double RETREAT_HEIGHT = 0.200 + GRIPPER_HEIGHT + BOARD_HEIGHT + BLOCK_HEIGHT; // 0.414m
+
   // ========== 成员变量 ==========
   rclcpp_action::Server<MoveAction>::SharedPtr action_server_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -85,11 +94,19 @@ private:
       std::shared_ptr<const MoveAction::Goal> goal)
   {
     RCLCPP_INFO(this->get_logger(),
-                "收到移动请求: piece=%s, target=(%d,%d)",
-                goal->move.piece.id.c_str(),
+                "收到请求: phase=%d, type=%d, color=%d, to_cell=(%d,%d)",
+                goal->phase,
+                goal->move.piece.type,
+                goal->move.piece.color,
                 goal->move.to_cell.col,
                 goal->move.to_cell.row);
     (void)uuid;
+
+    if (goal->phase > MoveAction::Goal::PHASE_RETREAT)
+    {
+      RCLCPP_WARN(this->get_logger(), "无效的 phase: %d", goal->phase);
+      return rclcpp_action::GoalResponse::REJECT;
+    }
 
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   }
@@ -107,95 +124,160 @@ private:
     std::thread{std::bind(&MoveToMarker::execute, this, _1), goal_handle}.detach();
   }
 
-  // ========== 主执行函数：执行完整的移动流程 ==========
+  // ========== 主执行函数 ==========
   void execute(const std::shared_ptr<GoalHandleMove> goal_handle)
   {
-    RCLCPP_INFO(this->get_logger(), "开始执行完整移动流程");
-
     const auto goal = goal_handle->get_goal();
     auto feedback = std::make_shared<MoveAction::Feedback>();
     auto result = std::make_shared<MoveAction::Result>();
 
-    // 从 goal 中提取信息
-    std::string piece_id = goal->move.piece.id;
-    std::string piece_color = goal->move.piece.color;
+    uint8_t phase = goal->phase;
+    auto piece_cells = goal->move.piece.cells;
     uint32_t target_col = goal->move.to_cell.col;
     uint32_t target_row = goal->move.to_cell.row;
 
-    RCLCPP_INFO(this->get_logger(),
-                "移动棋子: piece=%s, color=%s, target=(%d,%d)",
-                piece_id.c_str(), piece_color.c_str(),
-                target_col, target_row);
+    bool success = false;
 
-    // 计算目标的真实世界坐标
-    geometry_msgs::msg::PoseStamped target_pose =
-        calculateWorldPose(target_col, target_row);
-
-    RCLCPP_INFO(this->get_logger(),
-                "目标世界坐标: x=%.3f, y=%.3f, z=%.3f",
-                target_pose.pose.position.x,
-                target_pose.pose.position.y,
-                target_pose.pose.position.z);
-
-    // bool success = true;
-
-    // ========== Phase 1: APPROACH ==========
-    feedback->phase = "approach";
-    feedback->progress = 0.0;
-    goal_handle->publish_feedback(feedback);
-
-    if (!execute_approach(goal_handle, feedback, target_pose))
+    switch (phase)
     {
-      RCLCPP_ERROR(this->get_logger(), "❌ Approach 阶段失败");
-      result->success = false;
-      goal_handle->abort(result);
-      return;
+    case MoveAction::Goal::PHASE_IDLE:
+      RCLCPP_INFO(this->get_logger(), "执行 IDLE");
+      success = true;
+      break;
+
+    case MoveAction::Goal::PHASE_APPROACH:
+    {
+      // 📌 移动到棋子中心位置
+      if (piece_cells.empty())
+      {
+        RCLCPP_ERROR(this->get_logger(), "piece.cells 为空！");
+        success = false;
+        break;
+      }
+
+      // 计算棋子中心
+      geometry_msgs::msg::PoseStamped piece_center_pose =
+          calculatePieceCenterPose(piece_cells);
+
+      RCLCPP_INFO(this->get_logger(),
+                  "PHASE_APPROACH: 移动到棋子中心");
+
+      // 先到上方
+      success = execute_approach(goal_handle, feedback, piece_center_pose);
+      if (!success)
+        break;
+
+      // 再下降到棋子中心
+      success = execute_pick_place(goal_handle, feedback, piece_center_pose);
+      break;
     }
 
-    // ========== Phase 2: PICK_PLACE (下降到目标) ==========
-    feedback->phase = "place";
-    feedback->progress = 0.0;
-    goal_handle->publish_feedback(feedback);
-
-    if (!execute_pick_place(goal_handle, feedback, target_pose))
+    case MoveAction::Goal::PHASE_PICK_PLACE:
     {
-      RCLCPP_ERROR(this->get_logger(), "❌ Pick/Place 阶段失败");
-      result->success = false;
-      goal_handle->abort(result);
-      return;
-    }
-    // ========== 等待 Brain 控制夹爪 ==========
-    feedback->phase = "complete";
-    feedback->progress = 1.0;
-    goal_handle->publish_feedback(feedback);
+      // 📌 移动到目标位置中心
+      // 计算目标位置中心（如果棋子是 2x2，目标中心也需要计算）
+      geometry_msgs::msg::PoseStamped target_center_pose;
 
-    result->success = true;
-    goal_handle->succeed(result);
+      if (piece_cells.size() > 1)
+      {
+        // 多格子棋子：计算目标区域中心
+        // 假设 to_cell 是目标的左下角
+        double offset_col = 0.0;
+        double offset_row = 0.0;
+
+        // 根据棋子类型计算偏移
+        uint8_t piece_type = goal->move.piece.type;
+        if (piece_type == 1)
+        { // TYPE_2_2
+          offset_col = 0.5;
+          offset_row = 0.5;
+        }
+        else if (piece_type == 2)
+        { // TYPE_1_2 (horizontal)
+          offset_col = 0.5;
+          offset_row = 0.0;
+        }
+        else if (piece_type == 3)
+        { // TYPE_2_1 (vertical)
+          offset_col = 0.0;
+          offset_row = 0.5;
+        }
+
+        target_center_pose = calculateWorldPose(
+            target_col + offset_col,
+            target_row + offset_row);
+      }
+      else
+      {
+        // 1x1 棋子：直接使用 to_cell
+        target_center_pose = calculateWorldPose(target_col, target_row);
+      }
+
+      RCLCPP_INFO(this->get_logger(),
+                  "PHASE_PICK_PLACE: 移动到目标位置 (%d, %d)",
+                  target_col, target_row);
+
+      // 先到上方
+      success = execute_approach(goal_handle, feedback, target_center_pose);
+      if (!success)
+        break;
+
+      // 再下降到目标位置
+      success = execute_pick_place(goal_handle, feedback, target_center_pose);
+      break;
+    }
+
+    case MoveAction::Goal::PHASE_RETREAT:
+      RCLCPP_INFO(this->get_logger(), "PHASE_RETREAT: 向上移动");
+      success = execute_retreat(goal_handle, feedback);
+      break;
+
+    default:
+      RCLCPP_ERROR(this->get_logger(), "未知的 phase: %d", phase);
+      success = false;
+    }
+
+    result->success = success;
+    if (success)
+    {
+      goal_handle->succeed(result);
+      RCLCPP_INFO(this->get_logger(), "✅ Phase %d 完成", phase);
+    }
+    else
+    {
+      goal_handle->abort(result);
+      RCLCPP_ERROR(this->get_logger(), "❌ Phase %d 失败", phase);
+    }
+  }
+
+  // ========== 计算棋子中心位置 ==========
+  geometry_msgs::msg::PoseStamped calculatePieceCenterPose(
+      const std::vector<klotski_interfaces::msg::Cell> &cells)
+  {
+    if (cells.empty())
+    {
+      RCLCPP_ERROR(this->get_logger(), "cells 为空！");
+      return geometry_msgs::msg::PoseStamped();
+    }
+
+    // 计算所有格子的中心
+    double sum_col = 0.0;
+    double sum_row = 0.0;
+
+    for (const auto &cell : cells)
+    {
+      sum_col += cell.col;
+      sum_row += cell.row;
+    }
+
+    double center_col = sum_col / cells.size();
+    double center_row = sum_row / cells.size();
 
     RCLCPP_INFO(this->get_logger(),
-                "✅ MovePiece 完成：机械臂已到达 (%d, %d)，等待 GripPiece",
-                target_col, target_row);
+                "棋子占据 %zu 个格子，中心位置: (%.2f, %.2f)",
+                cells.size(), center_col, center_row);
 
-    // RCLCPP_INFO(this->get_logger(), "⏸️  等待外部夹爪控制...");
-    // // Brain 会在这里控制夹爪
-
-    // ========== Phase 3: RETREAT ==========
-    feedback->phase = "retreat";
-    feedback->progress = 0.0;
-    goal_handle->publish_feedback(feedback);
-
-    if (!execute_retreat(goal_handle, feedback))
-    {
-      RCLCPP_ERROR(this->get_logger(), "❌ Retreat 阶段失败");
-      result->success = false;
-      goal_handle->abort(result);
-      return;
-    }
-
-    // ========== 完成 ==========
-    result->success = true;
-    goal_handle->succeed(result);
-    RCLCPP_INFO(this->get_logger(), "✅ 完整移动流程成功");
+    return calculateWorldPose(center_col, center_row);
   }
 
   // ========== 各阶段执行函数 ==========
@@ -204,16 +286,16 @@ private:
       std::shared_ptr<MoveAction::Feedback> feedback,
       geometry_msgs::msg::PoseStamped target_pose)
   {
-    RCLCPP_INFO(this->get_logger(), "执行 APPROACH 阶段");
+    RCLCPP_INFO(this->get_logger(), "移动到目标上方 (APPROACH 高度)");
 
     feedback->progress = 0.1;
     goal_handle->publish_feedback(feedback);
 
-    // 在目标位置上方 20cm
-    target_pose.pose.position.z += 0.20;
+    // 📌 设置 APPROACH 高度 (314mm)
+    target_pose.pose.position.z = APPROACH_HEIGHT;
 
     RCLCPP_INFO(this->get_logger(),
-                "移动到 (%.3f, %.3f, %.3f)",
+                "目标: (%.3f, %.3f, %.3f)",
                 target_pose.pose.position.x,
                 target_pose.pose.position.y,
                 target_pose.pose.position.z);
@@ -253,13 +335,16 @@ private:
       std::shared_ptr<MoveAction::Feedback> feedback,
       geometry_msgs::msg::PoseStamped target_pose)
   {
-    RCLCPP_INFO(this->get_logger(), "执行 PICK_PLACE 阶段");
+    RCLCPP_INFO(this->get_logger(), "下降到抓取高度 (GRIP 高度)");
 
     feedback->progress = 0.1;
     goal_handle->publish_feedback(feedback);
 
+    // 📌 设置 GRIP 高度 (214mm)
+    target_pose.pose.position.z = GRIP_HEIGHT;
+
     RCLCPP_INFO(this->get_logger(),
-                "移动到 (%.3f, %.3f, %.3f)",
+                "目标: (%.3f, %.3f, %.3f)",
                 target_pose.pose.position.x,
                 target_pose.pose.position.y,
                 target_pose.pose.position.z);
@@ -288,31 +373,26 @@ private:
     feedback->progress = 1.0;
     goal_handle->publish_feedback(feedback);
 
-    if (success)
-    {
-      RCLCPP_INFO(this->get_logger(), "✅ 已到达目标位置");
-    }
-
     return success;
   }
 
-  bool execute_retreat(
-      const std::shared_ptr<GoalHandleMove> goal_handle,
-      std::shared_ptr<MoveAction::Feedback> feedback)
+  bool execute_retreat(const std::shared_ptr<GoalHandleMove> goal_handle, std::shared_ptr<MoveAction::Feedback> feedback)
   {
-    RCLCPP_INFO(this->get_logger(), "执行 RETREAT 阶段");
+    RCLCPP_INFO(this->get_logger(), "向上撤退 (RETREAT 高度)");
 
     feedback->progress = 0.2;
     goal_handle->publish_feedback(feedback);
 
+    // 📌 获取当前 x, y 位置，但设置新的 z 高度
     geometry_msgs::msg::PoseStamped current_pose;
     current_pose.header.frame_id = move_group_interface->getPlanningFrame();
     current_pose.pose = move_group_interface->getCurrentPose().pose;
 
-    current_pose.pose.position.z += 0.20;
+    // 📌 设置 RETREAT 高度 (414mm)
+    current_pose.pose.position.z = RETREAT_HEIGHT;
 
     RCLCPP_INFO(this->get_logger(),
-                "移动到 (%.3f, %.3f, %.3f)",
+                "目标: (%.3f, %.3f, %.3f)",
                 current_pose.pose.position.x,
                 current_pose.pose.position.y,
                 current_pose.pose.position.z);
@@ -345,21 +425,28 @@ private:
   }
 
   // ========== 辅助函数 ==========
-  geometry_msgs::msg::PoseStamped calculateWorldPose(uint32_t col, uint32_t row)
+  geometry_msgs::msg::PoseStamped calculateWorldPose(double col, double row)
   {
     geometry_msgs::msg::PoseStamped pose;
     pose.header.frame_id = "base_link";
     pose.header.stamp = this->now();
 
-    double grid_origin_x = 0.5;
-    double grid_origin_y = 0.3;
-    double grid_origin_z = 0.1;
-    double cell_size = 0.05;
+    // 📌 ArUco marker 在棋盘中心
+    double board_center_x = 0.13346;  // 测量得到的中心 x (133.45mm)
+    double board_center_y = -0.58839; // 测量得到的中心 y (-588.37mm)
 
+    // 📌 计算左下角位置
+    double board_width = 0.20;                                  // 20 cm
+    double board_height = 0.25;                                 // 25 cm
+    double grid_origin_x = board_center_x - board_width / 2.0;  // 0.60 - 0.10 = 0.50
+    double grid_origin_y = board_center_y - board_height / 2.0; // 0.425 - 0.125 = 0.30
+
+    // 📌 计算格子位置
+    double cell_size = 0.05;
     pose.pose.position.x = grid_origin_x + col * cell_size;
     pose.pose.position.y = grid_origin_y + row * cell_size;
-    pose.pose.position.z = grid_origin_z;
 
+    pose.pose.position.z = BOARD_HEIGHT; // 0.008m
     pose.pose.orientation.w = 1.0;
 
     return pose;
@@ -373,7 +460,55 @@ private:
 
   void tfCallback()
   {
-    // TF 逻辑
+    // need somthing to check if is moving
+    // if (is_moving_)
+    // {
+    //   return;
+    // }
+
+    std::string fromFrameRel = "base_link";
+    std::string toFrameRel = "OOI";
+    geometry_msgs::msg::TransformStamped t;
+
+    try
+    {
+      t = tf_buffer_->lookupTransform(fromFrameRel, toFrameRel, tf2::TimePointZero);
+
+      RCLCPP_INFO(this->get_logger(), "New Coordinate: [%.3f, %.3f, %.3f]",
+                  t.transform.translation.x,
+                  t.transform.translation.y,
+                  t.transform.translation.z);
+
+      geometry_msgs::msg::Pose targetPose;
+      targetPose.position.x = t.transform.translation.x;
+      targetPose.position.y = t.transform.translation.y;
+      targetPose.position.z = t.transform.translation.z + 0.1;
+
+      targetPose.orientation.x = 0.0;
+      targetPose.orientation.y = 1.0;
+      targetPose.orientation.z = 0.0;
+      targetPose.orientation.w = 0.0;
+
+      // is_moving_ = true;
+
+      move_group_interface->setPoseTarget(targetPose);
+      auto result = move_group_interface->move();
+
+      if (result == moveit::core::MoveItErrorCode::SUCCESS)
+      {
+        RCLCPP_INFO(this->get_logger(), "Move success!");
+      }
+      else
+      {
+        RCLCPP_ERROR(this->get_logger(), "Move failed!");
+      }
+
+      // is_moving_ = false;
+    }
+    catch (const tf2::TransformException &ex)
+    {
+      return;
+    }
   }
 
   moveit_msgs::msg::CollisionObject generateCollisionObject(
