@@ -1,8 +1,10 @@
 import time
+from typing import Optional
 
 import rclpy
 import serial
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 
 from klotski_interfaces.action import GripPiece
@@ -10,8 +12,20 @@ from klotski_interfaces.action import GripPiece
 
 class GripperActionServer(Node):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("gripper_action_server")
+
+        # Declare ROS parameters for configurable angles
+        self.declare_parameter("open_angle")
+        self.declare_parameter("close_angle")
+        self.declare_parameter("serial_port")
+        self.declare_parameter("baud_rate")
+
+        # Get configurable gripper angles from parameters
+        self.open_angle = self.get_parameter("open_angle").value
+        self.close_angle = self.get_parameter("close_angle").value
+        self.serial_port_name = self.get_parameter("serial_port").value
+        self.baud_rate = self.get_parameter("baud_rate").value
 
         # Action server with proper topic name matching brain expectation
         self._action_server = ActionServer(
@@ -24,46 +38,46 @@ class GripperActionServer(Node):
         )
 
         # Initialize serial port with error handling
-        self.serial_port = None
+        self.serial_port: Optional[serial.Serial] = None
         self._init_serial_port()
 
-        self.get_logger().info("GripperActionServer initialized")
+        self.get_logger().info(f"GripperActionServer initialized with open_angle={self.open_angle}, close_angle={self.close_angle}")
 
-    def _init_serial_port(self):
+    def _init_serial_port(self) -> None:
         """Initialize serial port with error handling"""
         try:
-            self.serial_port = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-            self.get_logger().info("Serial port /dev/ttyACM0 opened successfully")
+            self.serial_port = serial.Serial(self.serial_port_name, self.baud_rate, timeout=1)
+            self.get_logger().info(f"Serial port {self.serial_port_name} opened successfully")
         except serial.SerialException as e:
-            self.get_logger().warn(f"Failed to open serial port: {e}")
+            self.get_logger().warn(f"Failed to open serial port {self.serial_port_name}: {e}")
             self.get_logger().warn("Gripper will operate in simulation mode")
 
-    def goal_callback(self, goal_request):
+    def goal_callback(self, goal_request: GripPiece.Goal) -> GoalResponse:
         """Accept or reject incoming goals"""
         self.get_logger().info("Received goal request")
         return GoalResponse.ACCEPT
 
-    def cancel_callback(self, goal_handle):
+    def cancel_callback(self, cancel_request: ServerGoalHandle) -> CancelResponse:
         """Handle goal cancellation"""
         self.get_logger().info("Received cancel request")
         return CancelResponse.ACCEPT
 
-    def execute_callback(self, goal_handle):
+    def execute_callback(self, goal_handle: ServerGoalHandle) -> GripPiece.Result:
         """Execute gripper action with feedback"""
         goal = goal_handle.request
         feedback_msg = GripPiece.Feedback()
         result = GripPiece.Result()
 
-        # Determine gripper action
+        # Determine gripper action using configurable angles
         action_name = "UNKNOWN"
         angle = 0
 
         if goal.grip_action == GripPiece.Goal.GRIP_OPEN:
             action_name = "OPEN"
-            angle = 30
+            angle = self.open_angle
         elif goal.grip_action == GripPiece.Goal.GRIP_CLOSE:
             action_name = "CLOSE"
-            angle = 1
+            angle = self.close_angle
         else:
             self.get_logger().error(f"Invalid grip action: {goal.grip_action}")
             goal_handle.abort()
@@ -110,7 +124,7 @@ class GripperActionServer(Node):
 
         return result
 
-    def _send_gripper_command(self, angle):
+    def _send_gripper_command(self, angle: int) -> bool:
         """Send command to gripper hardware"""
         if self.serial_port is None:
             self.get_logger().info(f"Simulation mode: would set gripper angle to {angle}")
@@ -125,7 +139,7 @@ class GripperActionServer(Node):
             self.get_logger().error(f"Serial communication error: {e}")
             return False
 
-    def destroy_node(self):
+    def destroy_node(self) -> None:
         """Clean up resources"""
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.close()
@@ -133,9 +147,10 @@ class GripperActionServer(Node):
         super().destroy_node()
 
 
-def main(args=None):
+def main(args: Optional[list] = None) -> None:
     rclpy.init(args=args)
 
+    # Create gripper with default parameters (configurable via ROS parameters)
     gripper_action_server = GripperActionServer()
 
     try:
