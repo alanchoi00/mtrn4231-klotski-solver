@@ -8,6 +8,8 @@
 #include "klotski_interfaces/action/move_piece.hpp"
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <thread>
 #include <chrono>
 
@@ -43,11 +45,26 @@ public:
         std::bind(&MoveToMarker::tfCallback, this));
 
     // ========== MoveIt 初始化 ==========
+    // move_group_interface = std::make_unique<moveit::planning_interface::MoveGroupInterface>(
+    //     std::shared_ptr<rclcpp::Node>(this), "ur_manipulator");
+    // move_group_interface->setPlanningTime(10.0);
+
+    // std::string frame_id = move_group_interface->getPlanningFrame();
+    // ========== MoveIt 初始化 ==========
     move_group_interface = std::make_unique<moveit::planning_interface::MoveGroupInterface>(
         std::shared_ptr<rclcpp::Node>(this), "ur_manipulator");
-    move_group_interface->setPlanningTime(10.0);
+
+    //  统一设置规划器参数
+    move_group_interface->setPlannerId("RRTConnectkConfigDefault");
+    move_group_interface->setPlanningTime(10.0); // 10 秒规划时间
+    move_group_interface->setNumPlanningAttempts(10);
+    move_group_interface->setMaxVelocityScalingFactor(0.5);     // 50% 速度
+    move_group_interface->setMaxAccelerationScalingFactor(0.5); // 50% 加速度
 
     std::string frame_id = move_group_interface->getPlanningFrame();
+
+    RCLCPP_INFO(this->get_logger(),
+                "MoveIt 初始化完成，使用规划器: RRTConnectkConfigDefault");
 
     // ========== 碰撞物体设置 ==========
     auto col_object_backWall = generateCollisionObject(
@@ -55,7 +72,7 @@ public:
     auto col_object_sideWall = generateCollisionObject(
         0.04, 1.2, 1.0, -0.30, 0.25, 0.5, frame_id, "sideWall");
     auto col_object_table = generateCollisionObject(
-        2.4, 1.2, 0.04, 0.8, 0.3, 0.05, frame_id, "table");
+        2.4, 1.2, 0.04, 0.8, 0.3, -0.04, frame_id, "table");
     auto col_object_ceiling = generateCollisionObject(
         2.4, 2.4, 0.04, 0.85, 0.25, 1.5, frame_id, "ceiling");
 
@@ -147,7 +164,7 @@ private:
 
     case MoveAction::Goal::PHASE_APPROACH:
     {
-      // 📌 移动到棋子中心位置
+      //  移动到棋子中心位置
       if (piece_cells.empty())
       {
         RCLCPP_ERROR(this->get_logger(), "piece.cells 为空！");
@@ -174,7 +191,7 @@ private:
 
     case MoveAction::Goal::PHASE_PICK_PLACE:
     {
-      // 📌 移动到目标位置中心
+      //  移动到目标位置中心
       // 计算目标位置中心（如果棋子是 2x2，目标中心也需要计算）
       geometry_msgs::msg::PoseStamped target_center_pose;
 
@@ -291,7 +308,7 @@ private:
     feedback->progress = 0.1;
     goal_handle->publish_feedback(feedback);
 
-    // 📌 设置 APPROACH 高度 (314mm)
+    //  设置 APPROACH 高度 (314mm)
     target_pose.pose.position.z = APPROACH_HEIGHT;
 
     RCLCPP_INFO(this->get_logger(),
@@ -340,7 +357,7 @@ private:
     feedback->progress = 0.1;
     goal_handle->publish_feedback(feedback);
 
-    // 📌 设置 GRIP 高度 (214mm)
+    //  设置 GRIP 高度 (214mm)
     target_pose.pose.position.z = GRIP_HEIGHT;
 
     RCLCPP_INFO(this->get_logger(),
@@ -383,12 +400,12 @@ private:
     feedback->progress = 0.2;
     goal_handle->publish_feedback(feedback);
 
-    // 📌 获取当前 x, y 位置，但设置新的 z 高度
+    //  获取当前 x, y 位置，但设置新的 z 高度
     geometry_msgs::msg::PoseStamped current_pose;
     current_pose.header.frame_id = move_group_interface->getPlanningFrame();
     current_pose.pose = move_group_interface->getCurrentPose().pose;
 
-    // 📌 设置 RETREAT 高度 (414mm)
+    //  设置 RETREAT 高度 (414mm)
     current_pose.pose.position.z = RETREAT_HEIGHT;
 
     RCLCPP_INFO(this->get_logger(),
@@ -425,29 +442,65 @@ private:
   }
 
   // ========== 辅助函数 ==========
+  // geometry_msgs::msg::PoseStamped calculateWorldPose(double col, double row)
+  // {
+  //   geometry_msgs::msg::PoseStamped pose;
+  //   pose.header.frame_id = "base_link";
+  //   pose.header.stamp = this->now();
+
+  //   // ArUco marker 在棋盘中心
+  //   // double board_center_x = 0.13346;  // 测量得到的中心 x (133.45mm)
+  //   // double board_center_y = -0.58839; // 测量得到的中心 y (-588.37mm)
+
+  //   double board_center_x = 0.60;  // 测量得到的中心 x
+  //   double board_center_y = 0.425; // 测量得到的中心 y
+
+  //   //  计算左下角位置
+  //   double board_width = 0.20;                                  // 20 cm
+  //   double board_height = 0.25;                                 // 25 cm
+  //   double grid_origin_x = board_center_x - board_width / 2.0;  // 0.60 - 0.10 = 0.50
+  //   double grid_origin_y = board_center_y - board_height / 2.0; // 0.425 - 0.125 = 0.30
+
+  //   //  计算格子位置
+  //   double cell_size = 0.05;
+  //   pose.pose.position.x = grid_origin_x + col * cell_size;
+  //   pose.pose.position.y = grid_origin_y + row * cell_size;
+
+  //   pose.pose.position.z = BOARD_HEIGHT; // 0.008m
+  //   pose.pose.orientation.w = 1.0;
+
+  //   // make the end effector facing down
+  //   tf2::Quaternion q;
+  //   q.setRPY(0, M_PI, 0);
+  //   pose.pose.orientation = tf2::toMsg(q);
+  //   return pose;
+  // }
   geometry_msgs::msg::PoseStamped calculateWorldPose(double col, double row)
   {
     geometry_msgs::msg::PoseStamped pose;
     pose.header.frame_id = "base_link";
     pose.header.stamp = this->now();
 
-    // 📌 ArUco marker 在棋盘中心
-    double board_center_x = 0.13346;  // 测量得到的中心 x (133.45mm)
-    double board_center_y = -0.58839; // 测量得到的中心 y (-588.37mm)
+    //  棋盘中心
+    double board_center_x = 0.60;
+    double board_center_y = 0.425;
 
-    // 📌 计算左下角位置
-    double board_width = 0.20;                                  // 20 cm
-    double board_height = 0.25;                                 // 25 cm
-    double grid_origin_x = board_center_x - board_width / 2.0;  // 0.60 - 0.10 = 0.50
-    double grid_origin_y = board_center_y - board_height / 2.0; // 0.425 - 0.125 = 0.30
+    //  计算左下角位置
+    double board_width = 0.20;
+    double board_height = 0.25;
+    double grid_origin_x = board_center_x - board_width / 2.0;
+    double grid_origin_y = board_center_y - board_height / 2.0;
 
-    // 📌 计算格子位置
+    //  计算格子位置
     double cell_size = 0.05;
     pose.pose.position.x = grid_origin_x + col * cell_size;
     pose.pose.position.y = grid_origin_y + row * cell_size;
-
     pose.pose.position.z = BOARD_HEIGHT; // 0.008m
-    pose.pose.orientation.w = 1.0;
+
+    //  设置末端执行器朝下
+    tf2::Quaternion q;
+    q.setRPY(0.0, M_PI, 0.0); // Roll = 180°
+    pose.pose.orientation = tf2::toMsg(q);
 
     return pose;
   }
