@@ -1,0 +1,6 @@
+gripper_action_server:
+  ros__parameters:
+    open_angle: 40
+    close_angle: 1
+    serial_port: "/dev/ttyACM0"
+    baud_rate: 9600

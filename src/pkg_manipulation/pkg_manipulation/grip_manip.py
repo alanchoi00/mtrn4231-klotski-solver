@@ -3,6 +3,7 @@ from typing import Optional
 
 import rclpy
 import serial
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
@@ -14,20 +15,53 @@ class GripperActionServer(Node):
 
     def __init__(self) -> None:
         super().__init__("gripper_action_server")
+        self.declare_parameter(
+            "open_angle",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.INTEGER.value,
+                description="Gripper open angle",
+                read_only=False
+            )
+        )
+        self.declare_parameter(
+            "close_angle",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.INTEGER.value,
+                description="Gripper close angle",
+                read_only=False
+            )
+        )
+        self.declare_parameter(
+            "serial_port",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.STRING.value,
+                description="Serial port for gripper",
+                read_only=False
+            )
+        )
+        self.declare_parameter(
+            "baud_rate",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.INTEGER.value,
+                description="Baud rate for serial communication",
+                read_only=False
+            )
+        )
 
-        # Declare ROS parameters for configurable angles
-        self.declare_parameter("open_angle")
-        self.declare_parameter("close_angle")
-        self.declare_parameter("serial_port")
-        self.declare_parameter("baud_rate")
+        if not self.has_parameter("open_angle") or not self.get_parameter("open_angle").value:
+            raise ValueError("Required parameter 'open_angle' not set")
+        if not self.has_parameter("close_angle") or not self.get_parameter("close_angle").value:
+            raise ValueError("Required parameter 'close_angle' not set")
+        if not self.has_parameter("serial_port") or not self.get_parameter("serial_port").value:
+            raise ValueError("Required parameter 'serial_port' not set")
+        if not self.has_parameter("baud_rate") or not self.get_parameter("baud_rate").value:
+            raise ValueError("Required parameter 'baud_rate' not set")
 
-        # Get configurable gripper angles from parameters
         self.open_angle = self.get_parameter("open_angle").value
         self.close_angle = self.get_parameter("close_angle").value
         self.serial_port_name = self.get_parameter("serial_port").value
         self.baud_rate = self.get_parameter("baud_rate").value
 
-        # Action server with proper topic name matching brain expectation
         self._action_server = ActionServer(
             self,
             GripPiece,
@@ -37,20 +71,18 @@ class GripperActionServer(Node):
             cancel_callback=self.cancel_callback
         )
 
-        # Initialize serial port with error handling
-        self.serial_port: Optional[serial.Serial] = None
+        self.serial_port: Optional[object] = None
         self._init_serial_port()
 
-        self.get_logger().info(f"GripperActionServer initialized with open_angle={self.open_angle}, close_angle={self.close_angle}")
+        self.get_logger().info(
+            f"GripperActionServer initialized with open_angle={self.open_angle}, "
+            f"close_angle={self.close_angle}, serial_port={self.serial_port_name}, "
+            f"baud_rate={self.baud_rate}")
 
     def _init_serial_port(self) -> None:
         """Initialize serial port with error handling"""
-        try:
-            self.serial_port = serial.Serial(self.serial_port_name, self.baud_rate, timeout=1)
-            self.get_logger().info(f"Serial port {self.serial_port_name} opened successfully")
-        except serial.SerialException as e:
-            self.get_logger().warn(f"Failed to open serial port {self.serial_port_name}: {e}")
-            self.get_logger().warn("Gripper will operate in simulation mode")
+        self.serial_port = serial.Serial(self.serial_port_name, self.baud_rate)
+        self.get_logger().info(f"Serial port {self.serial_port_name} opened successfully")
 
     def goal_callback(self, goal_request: GripPiece.Goal) -> GoalResponse:
         """Accept or reject incoming goals"""

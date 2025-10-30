@@ -24,8 +24,6 @@ class TaskBrain(Node):
     def __init__(self):
         super().__init__("task_brain")
 
-        self.declare_parameter("relocalise_between_moves", True)
-
         # Initialize context
         self.ctx = BrainContext()
 
