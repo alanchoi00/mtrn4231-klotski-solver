@@ -177,7 +177,7 @@ class ActionExecutor:
             return
 
         phase_name = ExecutionPhase.get_name(brain.ctx.current_phase)
-        self._ui(f"[exec] {phase_name} progress: {fb.progress:.2f}")
+        self._ui(f"[exec] {phase_name} progress...")
 
     def _on_move_result(self, res_fut: Future) -> None:
         """Handle move action result."""
