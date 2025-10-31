@@ -9,6 +9,15 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
 def generate_launch_description():
+    """
+    Klotski robot system launch description.
+    This launch file starts the manipulation, planning, and brain nodes,
+    along with an optional rosbridge websocket server.
+    Usage:
+    ```
+    ros2 launch klotski.launch.py start_rosbridge:=true|false
+    ```
+    """
     start_rosbridge = LaunchConfiguration('start_rosbridge')
 
     manip_launch = PathJoinSubstitution([
