@@ -48,15 +48,6 @@ class GripperActionServer(Node):
             )
         )
 
-        if not self.has_parameter("open_angle") or not self.get_parameter("open_angle").value:
-            raise ValueError("Required parameter 'open_angle' not set")
-        if not self.has_parameter("close_angle") or not self.get_parameter("close_angle").value:
-            raise ValueError("Required parameter 'close_angle' not set")
-        if not self.has_parameter("serial_port") or not self.get_parameter("serial_port").value:
-            raise ValueError("Required parameter 'serial_port' not set")
-        if not self.has_parameter("baud_rate") or not self.get_parameter("baud_rate").value:
-            raise ValueError("Required parameter 'baud_rate' not set")
-
         self.open_angle = self.get_parameter("open_angle").value
         self.close_angle = self.get_parameter("close_angle").value
         self.serial_port_name = self.get_parameter("serial_port").value
