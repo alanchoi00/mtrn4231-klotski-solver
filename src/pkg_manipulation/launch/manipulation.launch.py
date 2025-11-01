@@ -86,7 +86,7 @@ def generate_launch_description():
             PathJoinSubstitution([
                 FindPackageShare("pkg_manipulation"),
                 "config",
-                "arm_manipulator.config.yaml"
+                "arm.config.yaml"
             ])
         ],
     )
