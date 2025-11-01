@@ -72,15 +72,19 @@ class GripperActionServer(Node):
 
     def _init_serial_port(self) -> None:
         """Initialize serial port with error handling"""
-        self.serial_port = serial.Serial(self.serial_port_name, self.baud_rate)
-        self.get_logger().info(f"Serial port {self.serial_port_name} opened successfully")
+        try:
+            self.serial_port = serial.Serial(self.serial_port_name, self.baud_rate)
+            self.get_logger().info(f"Serial port {self.serial_port_name} opened successfully")
+        except serial.SerialException as e:
+            self.serial_port = None
+            self.get_logger().error(f"Failed to open serial port {self.serial_port_name}: {e}")
 
-    def goal_callback(self, goal_request: GripPiece.Goal) -> GoalResponse:
+    def goal_callback(self, _: GripPiece.Goal) -> GoalResponse:
         """Accept or reject incoming goals"""
         self.get_logger().info("Received goal request")
         return GoalResponse.ACCEPT
 
-    def cancel_callback(self, cancel_request: ServerGoalHandle) -> CancelResponse:
+    def cancel_callback(self, _: ServerGoalHandle) -> CancelResponse:
         """Handle goal cancellation"""
         self.get_logger().info("Received cancel request")
         return CancelResponse.ACCEPT
@@ -91,7 +95,6 @@ class GripperActionServer(Node):
         feedback_msg = GripPiece.Feedback()
         result = GripPiece.Result()
 
-        # Determine gripper action using configurable angles
         action_name = "UNKNOWN"
         angle = 0
 
@@ -133,7 +136,7 @@ class GripperActionServer(Node):
 
                 feedback_msg.progress = float(i) / steps
                 goal_handle.publish_feedback(feedback_msg)
-                time.sleep(0.1)  # Simulate gripper movement time
+                time.sleep(0.01)  # Simulate gripper movement time
 
             # Success
             self.get_logger().info(f"Gripper {action_name} completed successfully")
@@ -173,7 +176,6 @@ class GripperActionServer(Node):
 def main(args: Optional[list] = None) -> None:
     rclpy.init(args=args)
 
-    # Create gripper with default parameters (configurable via ROS parameters)
     gripper_action_server = GripperActionServer()
 
     try:
