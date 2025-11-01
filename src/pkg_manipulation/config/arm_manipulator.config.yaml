@@ -21,8 +21,12 @@ arm_manipulator:
     retreat_offset: 0.200    # Height above grip position for retreat
 
     # Board geometry (in meters)
+    # SIM
     board_center_x: 0.60     # X position of board center in base_link frame
     board_center_y: 0.425    # Y position of board center in base_link frame
+    # LAB
+    # board_center_x: 0.13346     # X position of board center in base_link frame
+    # board_center_y: -0.58839    # Y position of board center in base_link frame
     board_width: 0.20        # Width of board (4 cells)
     board_length: 0.25       # Length of board (5 cells)
     cell_size: 0.05          # Size of each grid cell
