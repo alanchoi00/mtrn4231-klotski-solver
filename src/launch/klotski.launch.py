@@ -1,9 +1,11 @@
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
-from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Command, FindExecutable
 from launch_ros.substitutions import FindPackageShare
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Command, FindExecutable
 
 def get_robot_description():
     jl  = PathJoinSubstitution([FindPackageShare("ur_description"), "config", "ur5e", "joint_limits.yaml"])
@@ -35,19 +37,41 @@ def get_robot_description_kinematics():
     )}
 
 def generate_launch_description():
+    """
+    Klotski robot system launch description.
+    This launch file starts the manipulation, planning, and brain nodes,
+    along with an optional rosbridge websocket server.
+    Usage:
+    ```
+    ros2 launch klotski.launch.py start_rosbridge:=true|false
+    ```
+    """
     start_rosbridge = LaunchConfiguration('start_rosbridge')
-    return LaunchDescription([
-        DeclareLaunchArgument('start_rosbridge', default_value='true'),
 
-        Node(
-            package='pkg_brain',
-            executable='task_brain',
-            name='task_brain',
-            output='screen',
-            parameters=[{
-                'auto_continue': True,
-                'relocalise_between_moves': True,
-            }],
+    manip_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_manipulation'), 'launch', 'manipulation.launch.py'
+    ])
+
+    plan_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_plan'), 'launch', 'plan.launch.py'
+    ])
+
+    brain_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_brain'), 'launch', 'brain.launch.py'
+    ])
+
+    # Parameters for move_to_marker node
+    params = [
+        get_robot_description(),
+        get_robot_description_semantic(),
+        get_robot_description_kinematics(),
+    ]
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'start_rosbridge',
+            default_value='true',
+            description='Whether to start rosbridge websocket'
         ),
 
         Node(
@@ -58,10 +82,23 @@ def generate_launch_description():
             condition=IfCondition(start_rosbridge),
         ),
 
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(manip_launch),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(plan_launch),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(brain_launch),
+        ),
+
         Node(
             package='ur5emoveit', 
             executable='move_to_marker', 
             name='move_to_marker', 
             output='screen', 
-            parameters=params),
+            parameters=params
+        ),
     ])
