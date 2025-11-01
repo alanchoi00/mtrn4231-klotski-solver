@@ -1,11 +1,11 @@
 arm_manipulator:
   ros__parameters:
     # MoveIt planning parameters
-    planning_time: 10.0
-    num_planning_attempts: 10
-    max_velocity_scaling_factor: 0.5
-    max_acceleration_scaling_factor: 0.5
-    planner_id: "RRTConnectkConfigDefault"
+    planning_time: 30.0
+    num_planning_attempts: 15
+    max_velocity_scaling_factor: 0.3
+    max_acceleration_scaling_factor: 0.3
+    planner_id: "RRTstarkConfigDefault"
 
     # Robot-specific parameters
     robot_ip: "192.168.0.100"
@@ -31,4 +31,13 @@ arm_manipulator:
     elbow_min_angle: 60.0    # Minimum elbow angle
     elbow_max_angle: 150.0   # Maximum elbow angle
     elbow_constraint_weight: 1.0
+
+    # Cartesian path planning parameters
+    cartesian_eef_step: 0.01          # End-effector step size for Cartesian paths (meters)
+    cartesian_jump_threshold: 0.0     # Jump threshold for Cartesian paths (0.0 = disabled)
+    cartesian_fraction_threshold: 0.8  # Minimum fraction of path that must be valid
+
+    # Trajectory smoothing parameters
+    enable_trajectory_smoothing: true
+    replan_attempts: 3
 

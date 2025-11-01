@@ -50,19 +50,15 @@ def get_robot_description_semantic():
     return {"robot_description_semantic": robot_description_semantic_content}
 
 
-def get_robot_description_kinematics():
-    """Generate robot description kinematics"""
-    kinematics_yaml = PathJoinSubstitution(
-        [FindPackageShare("ur_moveit_config"), "config", "kinematics.yaml"]
-    )
-    return {"robot_description_kinematics": kinematics_yaml}
-
-
 def generate_launch_description():
     # Get robot descriptions
     robot_description = get_robot_description()
     robot_description_semantic = get_robot_description_semantic()
-    robot_description_kinematics = get_robot_description_kinematics()
+    robot_description_kinematics = PathJoinSubstitution([
+        FindPackageShare('ur_moveit_config'),
+        'config',
+        'kinematics.yaml'
+    ])
 
     # Gripper node with config
     gripper_node = Node(

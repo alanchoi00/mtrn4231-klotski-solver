@@ -32,6 +32,11 @@ ArmManipulator::ArmManipulator() : Node("arm_manipulator") {
   move_group_interface_->setMaxAccelerationScalingFactor(
       max_acceleration_scaling_factor_);
 
+  // Enable trajectory smoothing and optimization
+  move_group_interface_->allowReplanning(true);
+  move_group_interface_->allowLooking(true);
+  move_group_interface_->setReplanAttempts(replan_attempts_);
+
   std::string frame_id = move_group_interface_->getPlanningFrame();
 
   RCLCPP_INFO(this->get_logger(), "MoveIt initialized with planner: %s",
@@ -83,6 +88,11 @@ void ArmManipulator::declareAndLoadParameters() {
   this->declare_parameter<double>("elbow_min_angle");
   this->declare_parameter<double>("elbow_max_angle");
   this->declare_parameter<double>("elbow_constraint_weight");
+  this->declare_parameter<double>("cartesian_eef_step");
+  this->declare_parameter<double>("cartesian_jump_threshold");
+  this->declare_parameter<double>("cartesian_fraction_threshold");
+  this->declare_parameter<bool>("enable_trajectory_smoothing");
+  this->declare_parameter<int>("replan_attempts");
 
   // Get parameters
   planning_time_ = this->get_parameter("planning_time").as_double();
@@ -109,6 +119,14 @@ void ArmManipulator::declareAndLoadParameters() {
   elbow_max_angle_ = this->get_parameter("elbow_max_angle").as_double();
   elbow_constraint_weight_ =
       this->get_parameter("elbow_constraint_weight").as_double();
+  cartesian_eef_step_ = this->get_parameter("cartesian_eef_step").as_double();
+  cartesian_jump_threshold_ =
+      this->get_parameter("cartesian_jump_threshold").as_double();
+  cartesian_fraction_threshold_ =
+      this->get_parameter("cartesian_fraction_threshold").as_double();
+  enable_trajectory_smoothing_ =
+      this->get_parameter("enable_trajectory_smoothing").as_bool();
+  replan_attempts_ = this->get_parameter("replan_attempts").as_int();
 
   RCLCPP_INFO(this->get_logger(), "Parameters loaded successfully");
 }
@@ -263,28 +281,36 @@ bool ArmManipulator::execute_approach(
               target_pose.pose.position.x, target_pose.pose.position.y,
               target_pose.pose.position.z);
 
+  // Check if target is reachable
+  auto current_pose = move_group_interface_->getCurrentPose();
+  double distance =
+      sqrt(pow(target_pose.pose.position.x - current_pose.pose.position.x, 2) +
+           pow(target_pose.pose.position.y - current_pose.pose.position.y, 2) +
+           pow(target_pose.pose.position.z - current_pose.pose.position.z, 2));
+  RCLCPP_INFO(this->get_logger(), "Distance to target: %.3fm", distance);
+
   feedback->progress = 0.3;
   goal_handle->publish_feedback(feedback);
-
-  move_group_interface_->setPoseTarget(target_pose);
 
   feedback->progress = 0.5;
   goal_handle->publish_feedback(feedback);
 
-  moveit::planning_interface::MoveGroupInterface::Plan plan;
-  bool success = (move_group_interface_->plan(plan) ==
-                  moveit::core::MoveItErrorCode::SUCCESS);
+  // Try Cartesian path first for smoother motion
+  bool success = planAndExecuteCartesianPath(target_pose, false);
 
   if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "Planning failed");
-    return false;
+    RCLCPP_WARN(this->get_logger(),
+                "Cartesian planning failed, trying regular planning");
+    success = planAndExecuteSmoothedMotion(target_pose, false);
   }
 
-  feedback->progress = 0.7;
-  goal_handle->publish_feedback(feedback);
-
-  success = (move_group_interface_->execute(plan) ==
-             moveit::core::MoveItErrorCode::SUCCESS);
+  if (!success) {
+    RCLCPP_ERROR(this->get_logger(), "All planning attempts failed");
+    RCLCPP_ERROR(this->get_logger(), "Current robot pose: (%.3f, %.3f, %.3f)",
+                 move_group_interface_->getCurrentPose().pose.position.x,
+                 move_group_interface_->getCurrentPose().pose.position.y,
+                 move_group_interface_->getCurrentPose().pose.position.z);
+  }
 
   feedback->progress = 1.0;
   goal_handle->publish_feedback(feedback);
@@ -307,33 +333,21 @@ bool ArmManipulator::execute_pick_place(
               target_pose.pose.position.x, target_pose.pose.position.y,
               target_pose.pose.position.z);
 
-  move_group_interface_->setPoseTarget(target_pose);
-
-  // Add joint constraints
-  auto constraints = set_joint_constraints();
-  move_group_interface_->setPathConstraints(constraints);
-
   feedback->progress = 0.3;
   goal_handle->publish_feedback(feedback);
 
-  moveit::planning_interface::MoveGroupInterface::Plan plan;
-  bool success = (move_group_interface_->plan(plan) ==
-                  moveit::core::MoveItErrorCode::SUCCESS);
+  // For vertical movements like pick/place, Cartesian path is ideal
+  bool success = planAndExecuteCartesianPath(target_pose, true);
 
   if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "Planning failed");
-    move_group_interface_->clearPathConstraints();
-    return false;
+    RCLCPP_WARN(
+        this->get_logger(),
+        "Cartesian planning failed for pick/place, trying regular planning");
+    success = planAndExecuteSmoothedMotion(target_pose, true);
   }
 
   feedback->progress = 0.6;
   goal_handle->publish_feedback(feedback);
-
-  success = (move_group_interface_->execute(plan) ==
-             moveit::core::MoveItErrorCode::SUCCESS);
-
-  // Clear constraints
-  move_group_interface_->clearPathConstraints();
 
   feedback->progress = 1.0;
   goal_handle->publish_feedback(feedback);
@@ -363,30 +377,18 @@ bool ArmManipulator::execute_retreat(
   feedback->progress = 0.4;
   goal_handle->publish_feedback(feedback);
 
-  move_group_interface_->setPoseTarget(current_pose);
-
-  // Add joint constraints
-  auto constraints = set_joint_constraints();
-  move_group_interface_->setPathConstraints(constraints);
-
-  moveit::planning_interface::MoveGroupInterface::Plan plan;
-  bool success = (move_group_interface_->plan(plan) ==
-                  moveit::core::MoveItErrorCode::SUCCESS);
+  // For retreat (vertical movement), Cartesian path is ideal
+  bool success = planAndExecuteCartesianPath(current_pose, true);
 
   if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "Planning failed");
-    move_group_interface_->clearPathConstraints();
-    return false;
+    RCLCPP_WARN(
+        this->get_logger(),
+        "Cartesian planning failed for retreat, trying regular planning");
+    success = planAndExecuteSmoothedMotion(current_pose, true);
   }
 
   feedback->progress = 0.7;
   goal_handle->publish_feedback(feedback);
-
-  success = (move_group_interface_->execute(plan) ==
-             moveit::core::MoveItErrorCode::SUCCESS);
-
-  // Clear constraints
-  move_group_interface_->clearPathConstraints();
 
   feedback->progress = 1.0;
   goal_handle->publish_feedback(feedback);
@@ -445,6 +447,8 @@ geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double col,
 
 moveit_msgs::msg::Constraints ArmManipulator::set_joint_constraints() {
   moveit_msgs::msg::Constraints constraints;
+
+  // Elbow joint constraint
   moveit_msgs::msg::JointConstraint elbow_constraint;
   elbow_constraint.joint_name = "elbow_joint";
 
@@ -461,10 +465,34 @@ moveit_msgs::msg::Constraints ArmManipulator::set_joint_constraints() {
   elbow_constraint.tolerance_above = max_angle - midpoint;
   elbow_constraint.weight = elbow_constraint_weight_;
 
-  RCLCPP_INFO(this->get_logger(),
-              "Elbow constraint: %.1f° to %.1f° (weight: %.1f)",
-              elbow_min_angle_, elbow_max_angle_, elbow_constraint_weight_);
   constraints.joint_constraints.push_back(elbow_constraint);
+
+  // Add wrist constraints to prevent excessive twisting
+  moveit_msgs::msg::JointConstraint wrist1_constraint;
+  wrist1_constraint.joint_name = "wrist_1_joint";
+  wrist1_constraint.position = -M_PI / 2;        // -90 degrees
+  wrist1_constraint.tolerance_below = M_PI / 4;  // ±45 degrees tolerance
+  wrist1_constraint.tolerance_above = M_PI / 4;
+  wrist1_constraint.weight = 0.5;
+
+  constraints.joint_constraints.push_back(wrist1_constraint);
+
+  // Add shoulder lift constraint to prevent excessive upward movement
+  moveit_msgs::msg::JointConstraint shoulder_lift_constraint;
+  shoulder_lift_constraint.joint_name = "shoulder_lift_joint";
+  shoulder_lift_constraint.position = -M_PI / 2;  // -90 degrees (horizontal)
+  shoulder_lift_constraint.tolerance_below =
+      M_PI / 3;  // Allow 60 degrees below
+  shoulder_lift_constraint.tolerance_above =
+      M_PI / 6;  // Allow 30 degrees above
+  shoulder_lift_constraint.weight = 0.3;
+
+  constraints.joint_constraints.push_back(shoulder_lift_constraint);
+
+  RCLCPP_INFO(this->get_logger(),
+              "Applied joint constraints: elbow (%.1f° to %.1f°), wrist_1 "
+              "(±45°), shoulder_lift (±30°/60°)",
+              elbow_min_angle_, elbow_max_angle_);
 
   return constraints;
 }
@@ -494,6 +522,128 @@ moveit_msgs::msg::CollisionObject ArmManipulator::generateCollisionObject(
   collision_object.operation = collision_object.ADD;
 
   return collision_object;
+}
+
+bool ArmManipulator::planAndExecuteCartesianPath(
+    const geometry_msgs::msg::PoseStamped& target_pose, bool use_constraints) {
+  // Get current pose
+  auto current_pose = move_group_interface_->getCurrentPose();
+
+  // Create waypoints for Cartesian path
+  std::vector<geometry_msgs::msg::Pose> waypoints;
+
+  // Add intermediate waypoint (optional for better path)
+  geometry_msgs::msg::Pose intermediate_pose = current_pose.pose;
+  intermediate_pose.position.z =
+      std::max(current_pose.pose.position.z, target_pose.pose.position.z) +
+      0.05;
+
+  // Only add intermediate waypoint if we're moving significantly
+  double distance =
+      sqrt(pow(target_pose.pose.position.x - current_pose.pose.position.x, 2) +
+           pow(target_pose.pose.position.y - current_pose.pose.position.y, 2));
+
+  if (distance > 0.1) {  // If moving more than 10cm horizontally
+    waypoints.push_back(intermediate_pose);
+  }
+
+  // Add final target
+  waypoints.push_back(target_pose.pose);
+
+  // Set constraints if requested
+  if (use_constraints) {
+    auto constraints = set_joint_constraints();
+    move_group_interface_->setPathConstraints(constraints);
+  }
+
+  // Plan Cartesian path
+  moveit_msgs::msg::RobotTrajectory trajectory;
+
+  double fraction = move_group_interface_->computeCartesianPath(
+      waypoints, cartesian_eef_step_, cartesian_jump_threshold_, trajectory);
+
+  RCLCPP_INFO(this->get_logger(),
+              "Cartesian path planned: %.2f%% of path achieved",
+              fraction * 100.0);
+
+  bool success = false;
+  if (fraction > cartesian_fraction_threshold_) {  // Use configurable threshold
+    // Execute the Cartesian trajectory
+    moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
+    cartesian_plan.trajectory_ = trajectory;
+
+    success = (move_group_interface_->execute(cartesian_plan) ==
+               moveit::core::MoveItErrorCode::SUCCESS);
+  } else {
+    RCLCPP_WARN(this->get_logger(),
+                "Cartesian path planning failed (%.2f%%), falling back to "
+                "regular planning",
+                fraction * 100.0);
+
+    // Fall back to regular motion planning
+    success = planAndExecuteSmoothedMotion(target_pose, use_constraints);
+  }
+
+  // Clear constraints
+  if (use_constraints) {
+    move_group_interface_->clearPathConstraints();
+  }
+
+  return success;
+}
+
+bool ArmManipulator::planAndExecuteSmoothedMotion(
+    const geometry_msgs::msg::PoseStamped& target_pose, bool use_constraints) {
+  // Set constraints if requested
+  if (use_constraints) {
+    auto constraints = set_joint_constraints();
+    move_group_interface_->setPathConstraints(constraints);
+  }
+
+  move_group_interface_->setPoseTarget(target_pose);
+
+  moveit::planning_interface::MoveGroupInterface::Plan plan;
+  bool success = (move_group_interface_->plan(plan) ==
+                  moveit::core::MoveItErrorCode::SUCCESS);
+
+  if (!success) {
+    RCLCPP_ERROR(this->get_logger(), "Motion planning failed");
+    if (use_constraints) {
+      move_group_interface_->clearPathConstraints();
+    }
+    return false;
+  }
+
+  // Apply trajectory smoothing and time parameterization if enabled
+  if (enable_trajectory_smoothing_) {
+    robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
+                                         move_group_interface_->getName());
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(),
+                             plan.trajectory_);
+
+    // Apply smoothing
+    trajectory_processing::IterativeParabolicTimeParameterization iptp;
+    bool time_param_success = iptp.computeTimeStamps(
+        rt, max_velocity_scaling_factor_, max_acceleration_scaling_factor_);
+
+    if (time_param_success) {
+      rt.getRobotTrajectoryMsg(plan.trajectory_);
+      RCLCPP_INFO(this->get_logger(), "Applied trajectory smoothing");
+    } else {
+      RCLCPP_WARN(this->get_logger(),
+                  "Trajectory smoothing failed, using original trajectory");
+    }
+  }
+
+  success = (move_group_interface_->execute(plan) ==
+             moveit::core::MoveItErrorCode::SUCCESS);
+
+  // Clear constraints
+  if (use_constraints) {
+    move_group_interface_->clearPathConstraints();
+  }
+
+  return success;
 }
 
 }  // namespace pkg_manipulation

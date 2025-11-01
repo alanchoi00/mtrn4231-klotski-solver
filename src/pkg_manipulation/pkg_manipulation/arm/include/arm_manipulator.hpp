@@ -14,6 +14,8 @@
 #include "klotski_interfaces/msg/piece.hpp"
 #include "moveit/move_group_interface/move_group_interface.h"
 #include "moveit/planning_scene_interface/planning_scene_interface.h"
+#include "moveit/robot_trajectory/robot_trajectory.h"
+#include "moveit/trajectory_processing/iterative_time_parameterization.h"
 #include "moveit_msgs/msg/collision_object.hpp"
 #include "moveit_msgs/msg/constraints.hpp"
 #include "moveit_msgs/msg/joint_constraint.hpp"
@@ -80,6 +82,15 @@ class ArmManipulator : public rclcpp::Node {
   double elbow_min_angle_;
   double elbow_max_angle_;
   double elbow_constraint_weight_;
+
+  // Cartesian path planning parameters
+  double cartesian_eef_step_;
+  double cartesian_jump_threshold_;
+  double cartesian_fraction_threshold_;
+
+  // Trajectory smoothing parameters
+  bool enable_trajectory_smoothing_;
+  int replan_attempts_;
 
   rclcpp_action::Server<MoveAction>::SharedPtr action_server_;
   std::unique_ptr<moveit::planning_interface::MoveGroupInterface>
@@ -193,6 +204,26 @@ class ArmManipulator : public rclcpp::Node {
   moveit_msgs::msg::CollisionObject generateCollisionObject(
       float size_x, float size_y, float size_z, float center_x, float center_y,
       float center_z, const std::string& frame_id, const std::string& id);
+
+  /**
+   * @brief Plans and executes a Cartesian path for smoother motion
+   * @param target_pose Target pose to reach
+   * @param use_constraints Whether to apply joint constraints
+   * @return true if successful, false otherwise
+   */
+  bool planAndExecuteCartesianPath(
+      const geometry_msgs::msg::PoseStamped& target_pose,
+      bool use_constraints = false);
+
+  /**
+   * @brief Plans and executes motion with enhanced trajectory smoothing
+   * @param target_pose Target pose to reach
+   * @param use_constraints Whether to apply joint constraints
+   * @return true if successful, false otherwise
+   */
+  bool planAndExecuteSmoothedMotion(
+      const geometry_msgs::msg::PoseStamped& target_pose,
+      bool use_constraints = false);
 };
 
 }  // namespace pkg_manipulation
