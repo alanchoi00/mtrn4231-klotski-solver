@@ -1,0 +1,47 @@
+arm_manipulator:
+  ros__parameters:
+    # MoveIt planning parameters
+    planning_time: 30.0
+    num_planning_attempts: 15
+    max_velocity_scaling_factor: 0.3
+    max_acceleration_scaling_factor: 0.3
+    planner_id: "RRTstarkConfigDefault"
+
+    # Robot-specific parameters
+    robot_ip: "192.168.0.100"
+    planning_group: "ur_manipulator"
+
+    # Height parameters (in meters)
+    board_height: 0.008      # 8mm
+    block_height: 0.015      # 15mm
+    gripper_height: 0.191    # 191mm
+
+    # Calculated height offsets (in meters)
+    approach_offset: 0.1     # Height above grip position for approach
+    retreat_offset: 0.200    # Height above grip position for retreat
+
+    # Board geometry (in meters)
+    # SIM
+    board_center_x: 0.60     # X position of board center in base_link frame
+    board_center_y: 0.425    # Y position of board center in base_link frame
+    # LAB
+    # board_center_x: 0.13346     # X position of board center in base_link frame
+    # board_center_y: -0.58839    # Y position of board center in base_link frame
+    board_width: 0.20        # Width of board (4 cells)
+    board_length: 0.25       # Length of board (5 cells)
+    cell_size: 0.05          # Size of each grid cell
+
+    # Elbow joint constraints (in degrees)
+    elbow_min_angle: 60.0    # Minimum elbow angle
+    elbow_max_angle: 150.0   # Maximum elbow angle
+    elbow_constraint_weight: 1.0
+
+    # Cartesian path planning parameters
+    cartesian_eef_step: 0.01          # End-effector step size for Cartesian paths (meters)
+    cartesian_jump_threshold: 0.0     # Jump threshold for Cartesian paths (0.0 = disabled)
+    cartesian_fraction_threshold: 0.8  # Minimum fraction of path that must be valid
+
+    # Trajectory smoothing parameters
+    enable_trajectory_smoothing: true
+    replan_attempts: 3
+

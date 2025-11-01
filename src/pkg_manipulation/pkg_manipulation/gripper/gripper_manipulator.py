@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import time
 from typing import Optional
 
@@ -11,10 +13,10 @@ from rclpy.node import Node
 from klotski_interfaces.action import GripPiece
 
 
-class GripperActionServer(Node):
+class GripperManipulator(Node):
 
     def __init__(self) -> None:
-        super().__init__("gripper_action_server")
+        super().__init__("gripper_manipulator")
         self.declare_parameter(
             "open_angle",
             descriptor=ParameterDescriptor(
@@ -176,14 +178,14 @@ class GripperActionServer(Node):
 def main(args: Optional[list] = None) -> None:
     rclpy.init(args=args)
 
-    gripper_action_server = GripperActionServer()
+    gripper_manipulator = GripperManipulator()
 
     try:
-        rclpy.spin(gripper_action_server)
+        rclpy.spin(gripper_manipulator)
     except KeyboardInterrupt:
-        gripper_action_server.get_logger().info("Shutting down due to keyboard interrupt")
+        gripper_manipulator.get_logger().info("Shutting down due to keyboard interrupt")
     finally:
-        gripper_action_server.destroy_node()
+        gripper_manipulator.destroy_node()
         rclpy.shutdown()
 
 
