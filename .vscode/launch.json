@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": false,
-      "cwd": "/home/mtrn/4231/mtrn4231-klotski-solver/src/pkg_plan/src",
-      "program": "/home/mtrn/4231/mtrn4231-klotski-solver/src/pkg_plan/src/build/Debug/outDebug",
+      "cwd": "${workspaceFolder}/src/pkg_plan/src",
+      "program": "${workspaceFolder}/src/pkg_plan/src/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

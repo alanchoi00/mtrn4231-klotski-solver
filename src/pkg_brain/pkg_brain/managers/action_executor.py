@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from klotski_interfaces.action._grip_piece import GripPiece_FeedbackMessage
+from klotski_interfaces.action._move_piece import MovePiece_FeedbackMessage
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.task import Future
@@ -159,7 +161,7 @@ class ActionExecutor:
         result_fut = goal_handle.get_result_async()
         result_fut.add_done_callback(self._on_grip_result)
 
-    def _on_move_feedback(self, fb: MovePiece.Feedback) -> None:
+    def _on_move_feedback(self, fb: MovePiece_FeedbackMessage) -> None:
         """Handle move action feedback."""
         from ..task_brain import TaskBrain  # Avoid circular import
         brain = self.node
@@ -167,9 +169,9 @@ class ActionExecutor:
             return
 
         phase_name = ExecutionPhase.get_name(brain.ctx.current_phase)
-        self._ui(f"[exec] {phase_name} progress: {fb.progress:.2f}")
+        self._ui(f"[exec] {phase_name} progress: {fb.feedback.progress:.0%}")
 
-    def _on_grip_feedback(self, fb: GripPiece.Feedback) -> None:
+    def _on_grip_feedback(self, fb: GripPiece_FeedbackMessage) -> None:
         """Handle grip action feedback."""
         from ..task_brain import TaskBrain  # Avoid circular import
         brain = self.node
@@ -177,7 +179,7 @@ class ActionExecutor:
             return
 
         phase_name = ExecutionPhase.get_name(brain.ctx.current_phase)
-        self._ui(f"[exec] {phase_name} progress...")
+        self._ui(f"[exec] {phase_name} progress: {fb.feedback.progress:.0%}")
 
     def _on_move_result(self, res_fut: Future) -> None:
         """Handle move action result."""

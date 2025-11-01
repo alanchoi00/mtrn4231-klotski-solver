@@ -1,0 +1,34 @@
+arm_manipulator:
+  ros__parameters:
+    # MoveIt planning parameters
+    planning_time: 10.0
+    num_planning_attempts: 10
+    max_velocity_scaling_factor: 0.5
+    max_acceleration_scaling_factor: 0.5
+    planner_id: "RRTConnectkConfigDefault"
+
+    # Robot-specific parameters
+    robot_ip: "192.168.0.100"
+    planning_group: "ur_manipulator"
+
+    # Height parameters (in meters)
+    board_height: 0.008      # 8mm
+    block_height: 0.015      # 15mm
+    gripper_height: 0.191    # 191mm
+
+    # Calculated height offsets (in meters)
+    approach_offset: 0.1     # Height above grip position for approach
+    retreat_offset: 0.200    # Height above grip position for retreat
+
+    # Board geometry (in meters)
+    board_center_x: 0.60     # X position of board center in base_link frame
+    board_center_y: 0.425    # Y position of board center in base_link frame
+    board_width: 0.20        # Width of board (4 cells)
+    board_length: 0.25       # Length of board (5 cells)
+    cell_size: 0.05          # Size of each grid cell
+
+    # Elbow joint constraints (in degrees)
+    elbow_min_angle: 60.0    # Minimum elbow angle
+    elbow_max_angle: 150.0   # Maximum elbow angle
+    elbow_constraint_weight: 1.0
+
