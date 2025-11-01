@@ -188,7 +188,7 @@ def main(args: Optional[list] = None) -> None:
     try:
         rclpy.spin(gripper_action_server)
     except KeyboardInterrupt:
-        pass
+        gripper_action_server.get_logger().info("Shutting down due to keyboard interrupt")
     finally:
         gripper_action_server.destroy_node()
         rclpy.shutdown()
