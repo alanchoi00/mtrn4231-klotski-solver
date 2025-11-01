@@ -20,6 +20,10 @@ add_executable(klotski_solve_service src/solve_service.cpp src/solve_service_nod
 ament_target_dependencies(klotski_solve_service rclcpp klotski_interfaces)
 install(TARGETS klotski_solve_service DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

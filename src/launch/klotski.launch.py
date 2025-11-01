@@ -1,26 +1,42 @@
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
 def generate_launch_description():
+    """
+    Klotski robot system launch description.
+    This launch file starts the manipulation, planning, and brain nodes,
+    along with an optional rosbridge websocket server.
+    Usage:
+    ```
+    ros2 launch klotski.launch.py start_rosbridge:=true|false
+    ```
+    """
     start_rosbridge = LaunchConfiguration('start_rosbridge')
-    return LaunchDescription([
-        DeclareLaunchArgument('start_rosbridge', default_value='true'),
 
-        Node(
-            package='pkg_brain',
-            executable='task_brain',
-            name='task_brain',
-            output='screen',
-            parameters=[{
-                'auto_continue': True,
-                'relocalise_between_moves': True,
-            }],
-            arguments=['--ros-args', '--log-level', 'DEBUG']
+    manip_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_manipulation'), 'launch', 'manipulation.launch.py'
+    ])
+
+    plan_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_plan'), 'launch', 'plan.launch.py'
+    ])
+
+    brain_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_brain'), 'launch', 'brain.launch.py'
+    ])
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'start_rosbridge',
+            default_value='true',
+            description='Whether to start rosbridge websocket'
         ),
 
         Node(
@@ -30,15 +46,15 @@ def generate_launch_description():
             output='screen',
             condition=IfCondition(start_rosbridge),
         ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(manip_launch),
+        ),
 
-        Node(
-            package='pkg_plan',
-            executable='klotski_solve_service',
-            name='solve_service',
-            output='screen',
-            parameters=[{
-                'use_sim_time': False,
-            }],
-            arguments=['--ros-args', '--log-level', 'DEBUG']
-        )
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(plan_launch),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(brain_launch),
+        ),
     ])
