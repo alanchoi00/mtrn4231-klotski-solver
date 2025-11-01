@@ -505,7 +505,7 @@ moveit_msgs::msg::CollisionObject ArmManipulator::generateCollisionObject(
   collision_object.id = id;
 
   shape_msgs::msg::SolidPrimitive primitive;
-  primitive.type = primitive.BOX;
+  primitive.type = shape_msgs::msg::SolidPrimitive::BOX;
   primitive.dimensions.resize(3);
   primitive.dimensions[0] = size_x;
   primitive.dimensions[1] = size_y;
