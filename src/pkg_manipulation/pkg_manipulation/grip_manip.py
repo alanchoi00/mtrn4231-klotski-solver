@@ -62,7 +62,7 @@ class GripperActionServer(Node):
             cancel_callback=self.cancel_callback
         )
 
-        self.serial_port: Optional[object] = None
+        self.serial_port: Optional[serial.Serial] = None
         self._init_serial_port()
 
         self.get_logger().info(
