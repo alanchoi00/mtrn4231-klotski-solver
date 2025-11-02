@@ -78,10 +78,17 @@ class ArmManipulator : public rclcpp::Node {
   double board_length_;
   double cell_size_;
 
-  // Elbow joint constraint parameters
+  // Joint constraint parameters
   double elbow_min_angle_;
   double elbow_max_angle_;
   double elbow_constraint_weight_;
+  double shoulder_pan_min_angle_;
+  double shoulder_pan_max_angle_;
+  double shoulder_lift_min_angle_;
+  double shoulder_lift_max_angle_;
+  double wrist_1_min_angle_;
+  double wrist_1_max_angle_;
+  double joint_constraint_weight_;
 
   // Cartesian path planning parameters
   double cartesian_eef_step_;

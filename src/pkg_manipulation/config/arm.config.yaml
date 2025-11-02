@@ -1,11 +1,11 @@
 arm_manipulator:
   ros__parameters:
-    # MoveIt planning parameters
-    planning_time: 30.0
-    num_planning_attempts: 15
-    max_velocity_scaling_factor: 0.3
-    max_acceleration_scaling_factor: 0.3
-    planner_id: "RRTstarkConfigDefault"
+    # MoveIt planning parameters - Optimized for speed while maintaining quality
+    planning_time: 10.0 # (s)
+    num_planning_attempts: 5
+    max_velocity_scaling_factor: 0.5
+    max_acceleration_scaling_factor: 0.5
+    planner_id: "RRTConnectkConfigDefault"
 
     # Robot-specific parameters
     robot_ip: "192.168.0.100"
@@ -31,10 +31,19 @@ arm_manipulator:
     board_length: 0.25       # Length of board (5 cells)
     cell_size: 0.05          # Size of each grid cell
 
-    # Elbow joint constraints (in degrees)
+    # Joint constraints (in degrees) - Help reduce search space for faster planning
     elbow_min_angle: 60.0    # Minimum elbow angle
     elbow_max_angle: 150.0   # Maximum elbow angle
     elbow_constraint_weight: 1.0
+
+    # Additional joint limits to speed up planning
+    shoulder_pan_min_angle: -180.0   # Base rotation limits
+    shoulder_pan_max_angle: 180.0
+    shoulder_lift_min_angle: -90.0   # Shoulder lift limits (avoid extreme positions)
+    shoulder_lift_max_angle: 0.0
+    wrist_1_min_angle: -135.0        # Wrist 1 limits
+    wrist_1_max_angle: -45.0
+    joint_constraint_weight: 0.5     # Lower weight for additional constraints
 
     # Cartesian path planning parameters
     cartesian_eef_step: 0.01          # End-effector step size for Cartesian paths (meters)
@@ -42,6 +51,9 @@ arm_manipulator:
     cartesian_fraction_threshold: 0.8  # Minimum fraction of path that must be valid
 
     # Trajectory smoothing parameters
-    enable_trajectory_smoothing: true
-    replan_attempts: 3
+    enable_trajectory_smoothing: false  # Disabled for faster planning
+    replan_attempts: 2                   # Reduced for faster execution
+
+    # Fast planning mode (prioritize speed over optimality)
+    fast_planning_mode: true             # Use faster settings when enabled
 

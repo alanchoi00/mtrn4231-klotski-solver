@@ -88,6 +88,13 @@ void ArmManipulator::declareAndLoadParameters() {
   this->declare_parameter<double>("elbow_min_angle");
   this->declare_parameter<double>("elbow_max_angle");
   this->declare_parameter<double>("elbow_constraint_weight");
+  this->declare_parameter<double>("shoulder_pan_min_angle");
+  this->declare_parameter<double>("shoulder_pan_max_angle");
+  this->declare_parameter<double>("shoulder_lift_min_angle");
+  this->declare_parameter<double>("shoulder_lift_max_angle");
+  this->declare_parameter<double>("wrist_1_min_angle");
+  this->declare_parameter<double>("wrist_1_max_angle");
+  this->declare_parameter<double>("joint_constraint_weight");
   this->declare_parameter<double>("cartesian_eef_step");
   this->declare_parameter<double>("cartesian_jump_threshold");
   this->declare_parameter<double>("cartesian_fraction_threshold");
@@ -119,6 +126,18 @@ void ArmManipulator::declareAndLoadParameters() {
   elbow_max_angle_ = this->get_parameter("elbow_max_angle").as_double();
   elbow_constraint_weight_ =
       this->get_parameter("elbow_constraint_weight").as_double();
+  shoulder_pan_min_angle_ =
+      this->get_parameter("shoulder_pan_min_angle").as_double();
+  shoulder_pan_max_angle_ =
+      this->get_parameter("shoulder_pan_max_angle").as_double();
+  shoulder_lift_min_angle_ =
+      this->get_parameter("shoulder_lift_min_angle").as_double();
+  shoulder_lift_max_angle_ =
+      this->get_parameter("shoulder_lift_max_angle").as_double();
+  wrist_1_min_angle_ = this->get_parameter("wrist_1_min_angle").as_double();
+  wrist_1_max_angle_ = this->get_parameter("wrist_1_max_angle").as_double();
+  joint_constraint_weight_ =
+      this->get_parameter("joint_constraint_weight").as_double();
   cartesian_eef_step_ = this->get_parameter("cartesian_eef_step").as_double();
   cartesian_jump_threshold_ =
       this->get_parameter("cartesian_jump_threshold").as_double();
@@ -448,51 +467,37 @@ geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double col,
 moveit_msgs::msg::Constraints ArmManipulator::set_joint_constraints() {
   moveit_msgs::msg::Constraints constraints;
 
-  // Elbow joint constraint
-  moveit_msgs::msg::JointConstraint elbow_constraint;
-  elbow_constraint.joint_name = "elbow_joint";
+  // Helper function to add joint constraint
+  auto addJointConstraint = [&](const std::string& joint_name, double min_deg,
+                                double max_deg, double weight) {
+    moveit_msgs::msg::JointConstraint constraint;
+    constraint.joint_name = joint_name;
 
-  // Convert degrees to radians
-  const double min_angle = elbow_min_angle_ * M_PI / 180.0;
-  const double max_angle = elbow_max_angle_ * M_PI / 180.0;
+    const double min_rad = min_deg * M_PI / 180.0;
+    const double max_rad = max_deg * M_PI / 180.0;
+    const double midpoint = (min_rad + max_rad) / 2.0;
 
-  // Calculate midpoint
-  const double midpoint = (min_angle + max_angle) / 2.0;
+    constraint.position = midpoint;
+    constraint.tolerance_below = midpoint - min_rad;
+    constraint.tolerance_above = max_rad - midpoint;
+    constraint.weight = weight;
 
-  // Set constraints
-  elbow_constraint.position = midpoint;
-  elbow_constraint.tolerance_below = midpoint - min_angle;
-  elbow_constraint.tolerance_above = max_angle - midpoint;
-  elbow_constraint.weight = elbow_constraint_weight_;
+    constraints.joint_constraints.push_back(constraint);
+  };
 
-  constraints.joint_constraints.push_back(elbow_constraint);
-
-  // Add wrist constraints to prevent excessive twisting
-  moveit_msgs::msg::JointConstraint wrist1_constraint;
-  wrist1_constraint.joint_name = "wrist_1_joint";
-  wrist1_constraint.position = -M_PI / 2;        // -90 degrees
-  wrist1_constraint.tolerance_below = M_PI / 4;  // ±45 degrees tolerance
-  wrist1_constraint.tolerance_above = M_PI / 4;
-  wrist1_constraint.weight = 0.5;
-
-  constraints.joint_constraints.push_back(wrist1_constraint);
-
-  // Add shoulder lift constraint to prevent excessive upward movement
-  moveit_msgs::msg::JointConstraint shoulder_lift_constraint;
-  shoulder_lift_constraint.joint_name = "shoulder_lift_joint";
-  shoulder_lift_constraint.position = -M_PI / 2;  // -90 degrees (horizontal)
-  shoulder_lift_constraint.tolerance_below =
-      M_PI / 3;  // Allow 60 degrees below
-  shoulder_lift_constraint.tolerance_above =
-      M_PI / 6;  // Allow 30 degrees above
-  shoulder_lift_constraint.weight = 0.3;
-
-  constraints.joint_constraints.push_back(shoulder_lift_constraint);
+  // Apply configurable joint constraints to reduce search space
+  addJointConstraint("elbow_joint", elbow_min_angle_, elbow_max_angle_,
+                     elbow_constraint_weight_);
+  addJointConstraint("shoulder_pan_joint", shoulder_pan_min_angle_,
+                     shoulder_pan_max_angle_, joint_constraint_weight_);
+  addJointConstraint("shoulder_lift_joint", shoulder_lift_min_angle_,
+                     shoulder_lift_max_angle_, joint_constraint_weight_);
+  addJointConstraint("wrist_1_joint", wrist_1_min_angle_, wrist_1_max_angle_,
+                     joint_constraint_weight_);
 
   RCLCPP_INFO(this->get_logger(),
-              "Applied joint constraints: elbow (%.1f° to %.1f°), wrist_1 "
-              "(±45°), shoulder_lift (±30°/60°)",
-              elbow_min_angle_, elbow_max_angle_);
+              "Applied %zu joint constraints to reduce planning search space",
+              constraints.joint_constraints.size());
 
   return constraints;
 }
