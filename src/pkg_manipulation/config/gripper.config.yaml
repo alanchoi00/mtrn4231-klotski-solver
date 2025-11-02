@@ -1,4 +1,4 @@
-gripper_action_server:
+gripper_manipulator:
   ros__parameters:
     open_angle: 40
     close_angle: 1

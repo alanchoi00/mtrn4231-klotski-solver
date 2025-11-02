@@ -46,6 +46,7 @@ def generate_launch_description():
             output='screen',
             condition=IfCondition(start_rosbridge),
         ),
+
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(manip_launch),
         ),
@@ -58,3 +59,4 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(brain_launch),
         ),
     ])
+

@@ -6,13 +6,20 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
-        "${workspaceFolder}/**"
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/src/pkg_manipulation/pkg_manipulation/arm/include",
+        "${workspaceFolder}/install/klotski_interfaces/include",
+        "${workspaceFolder}/install/klotski_interfaces/include/**",
+        "/opt/ros/humble/include/**",
+        "/usr/include/**"
       ],
       "name": "linux-gcc-arm64",
       "intelliSenseMode": "linux-gcc-arm64",
       "compilerPath": "/usr/bin/gcc",
-      "cStandard": "${default}",
-      "cppStandard": "${default}"
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "configurationProvider": "ms-vscode.cmake-tools"
     }
   ],
   "version": 4
