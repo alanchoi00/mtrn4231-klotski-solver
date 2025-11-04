@@ -32,6 +32,10 @@ def generate_launch_description():
         FindPackageShare('pkg_brain'), 'launch', 'brain.launch.py'
     ])
 
+    sense_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_sense'), 'launch', 'sense.launch.py'
+    ])
+
     return LaunchDescription([
         DeclareLaunchArgument(
             'start_rosbridge',
