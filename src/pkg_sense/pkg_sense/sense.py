@@ -1,3 +1,4 @@
+from klotski_interfaces.srv._capture_board import CaptureBoard_Response
 import rclpy
 import cv2
 import tf2_ros
@@ -419,27 +420,27 @@ class Sense(Node):
         except Exception as e:
             self.get_logger().error(f"Error in point_cloud_callback: {str(e)}")
 
-    def handle_capture_board(self, request, response):
+    def handle_capture_board(self, request, response: CaptureBoard_Response):
         # defaults in case we bail early
         response.state = BoardState()
-        response.success = False
-        response.message = "Uninitialized"
+        response.ok = False
+        response.note = "Uninitialized"
 
         if self.cv_image is None:
-            response.message = "No color frame yet"
+            response.note = "No color frame yet"
             return response
 
         image = self.cv_image.copy()
 
         info = detect_aruco_info(image)
         if len(info) < 4:
-            response.message = f"Need markers 0,1,2,3; detected: {sorted(info.keys()) if info else []}"
+            response.note = f"Need markers 0,1,2,3; detected: {sorted(info.keys()) if info else []}"
             return response
 
         try:
             Hmat, size = compute_homography_auto(info)
         except Exception as e:
-            response.message = f"Homography failed: {e}"
+            response.note = f"Homography failed: {e}"
             return response
 
         warped = warp_board(image, Hmat, size)
@@ -462,8 +463,8 @@ class Sense(Node):
         self.state_pub.publish(state_msg)
 
         response.state = state_msg
-        response.success = bool(counts_ok)
-        response.message = "Captured" if counts_ok else "Captured, but piece counts invalid (want 4B,1R,1G,4Y,2 empty)"
+        response.ok = bool(counts_ok)
+        response.note = "Captured" if counts_ok else "Captured, but piece counts invalid (want 4B,1R,1G,4Y,2 empty)"
         return response
 
 

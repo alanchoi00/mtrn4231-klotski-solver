@@ -58,7 +58,9 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(plan_launch),
         ),
-
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(sense_launch),
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(brain_launch),
         ),
