@@ -31,16 +31,23 @@ arm_manipulator:
     board_length: 0.25       # Length of board (5 cells)
     cell_size: 0.05          # Size of each grid cell
 
+
+    use_dynamic_board_position: true 
+    
     # Joint constraints (in degrees) - Help reduce search space for faster planning
     elbow_min_angle: 60.0    # Minimum elbow angle
     elbow_max_angle: 150.0   # Maximum elbow angle
     elbow_constraint_weight: 1.0
 
     # Additional joint limits to speed up planning
-    shoulder_pan_min_angle: -180.0   # Base rotation limits
-    shoulder_pan_max_angle: 180.0
-    shoulder_lift_min_angle: -90.0   # Shoulder lift limits (avoid extreme positions)
-    shoulder_lift_max_angle: 0.0
+    # shoulder_pan_min_angle: -180.0   # Base rotation limits
+    # shoulder_pan_max_angle: 180.0
+    shoulder_pan_min_angle: -90.0   # Base rotation limits
+    shoulder_pan_max_angle: 0.0
+    # shoulder_lift_min_angle: -90.0   # Shoulder lift limits (avoid extreme positions)
+    # shoulder_lift_max_angle: 0.0
+    shoulder_lift_min_angle: -180.0   # Shoulder lift limits (avoid extreme positions)
+    shoulder_lift_max_angle: -90.0
     wrist_1_min_angle: -135.0        # Wrist 1 limits
     wrist_1_max_angle: -45.0
     joint_constraint_weight: 0.5     # Lower weight for additional constraints
