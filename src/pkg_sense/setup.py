@@ -9,8 +9,12 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
-        (f'share/{package_name}/launch', ['launch/sense.launch.py']),
+        ('share/' + package_name, ['package.xml', 'HSV_TEST_README.md']),
+        (f'share/{package_name}/launch', [
+            'launch/sense.launch.py',
+            'launch/test_hsv_sense.launch.py',
+            'launch/test_hsv_simple.launch.py'
+        ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -22,7 +26,8 @@ setup(
     entry_points={
         'console_scripts': [
             'mock_sense = pkg_sense.mock_sense_node:main',
-            'sense = pkg_sense.sense:main'
+            'sense = pkg_sense.sense:main',
+            'test_hsv_sense = pkg_sense.test_hsv_sense:main'
         ],
     },
 )
