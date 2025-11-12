@@ -32,7 +32,7 @@ arm_manipulator:
     cell_size: 0.05          # Size of each grid cell
 
 
-    use_dynamic_board_position: true 
+    # use_dynamic_board_position: true 
     
     # Joint constraints (in degrees) - Help reduce search space for faster planning
     elbow_min_angle: 60.0    # Minimum elbow angle
