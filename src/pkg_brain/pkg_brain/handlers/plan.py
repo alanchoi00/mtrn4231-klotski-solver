@@ -16,9 +16,11 @@ class PlanHandler(BaseHandler):
 
         if ctx.sensed is None:
             return HandlerResult(HandlerStatus.NEXT, "sense first")
+        
+        if ctx.sensed == ctx.plan[ctx.plan_index-1]:
+            ctx.plan_index -= 1
+            return HandlerResult(HandlerStatus.NEXT, "sense same as prev")
 
-        if ctx.plan_received:
-            return HandlerResult(HandlerStatus.NEXT, "have plan")
 
         node.debug("[plan] Request plan from /plan/solve")
         ok = node.start_plan()
