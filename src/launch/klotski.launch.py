@@ -100,7 +100,7 @@ def generate_launch_description():
             launch_arguments={
                 'ur_type': 'ur5e',
                 'robot_ip': 'yyy.yyy.yyy.yyy',
-                'initial_joint_controller': 'joint_trajectory_controller',
+                'initial_joint_controller': 'scaled_joint_trajectory_controller',
                 'use_fake_hardware': 'true',
                 'launch_rviz': 'false',
             }.items(),
