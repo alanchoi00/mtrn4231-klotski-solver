@@ -26,7 +26,7 @@ MIN_CELL_COLOUR_AREA = 400      # area in pixels to count a cell as filled
 HSV_RANGES = {
     "red1":   ((0,   100,  80), (10,  255, 255)),
     "red2":   ((170, 100,  80), (180, 255, 255)),
-    "yellow": ((19,   72, 0), (78,  136, 255)),
+    "yellow": ((27, 59, 118), (79,  190, 255)),
     "green":  ((44,   32,  76), (94,  255, 255)),
     "blue":   ((95,   198,  0), (130, 255, 156)),
     "grey":   ((0,     0,  50), (180,  70, 230)),   # low-saturation greys

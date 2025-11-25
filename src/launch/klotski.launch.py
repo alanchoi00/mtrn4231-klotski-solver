@@ -152,6 +152,10 @@ def generate_launch_description():
                 ),
 
                 IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(sense_launch),
+                ),
+
+                IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(brain_launch),
                 ),
             ],
