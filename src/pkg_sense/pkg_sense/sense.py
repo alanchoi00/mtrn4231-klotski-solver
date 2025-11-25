@@ -17,16 +17,10 @@ from klotski_interfaces.msg import Board, BoardSpec, BoardState, Cell, Piece
 from klotski_interfaces.srv import CaptureBoard
 
 # ------------------------------
-
+# CONFIG
 W, H = 4, 5                     # grid: cols × rows
 ARUCO_DICT = cv2.aruco.DICT_ARUCO_ORIGINAL
-MIN_CELL_COLOUR_AREA = 300      # area in pixels to count a cell as filled
-
-# Physical board geometry (mm)
-BOARD_W_MM = 200.0              # 4 cells × 50 mm
-BOARD_H_MM = 250.0              # 5 cells × 50 mm
-OFFSET_MM  = 80.0               # marker centre offset from each edge
-
+MIN_CELL_COLOUR_AREA = 400      # area in pixels to count a cell as filled
 
 # HSV thresholds (tune to your lighting)
 HSV_RANGES = {
@@ -54,172 +48,88 @@ COLOR_YELLOW = getattr(Piece, "COLOR_YELLOW", 4)
 # ------------------------------
 # ARUCO DETECTION
 def detect_aruco_info(image_bgr):
-    """Detect ArUco 0,1,2,3 with a multi-pass detector on a single frame."""
+    """Detect ArUco 0,1,2,3 (DICT_ARUCO_ORIGINAL) and return centers + corners."""
     aruco = cv2.aruco
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     dictionary = aruco.getPredefinedDictionary(ARUCO_DICT)
+    params = aruco.DetectorParameters()
+    params.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
 
-    # Base params
-    base_params = aruco.DetectorParameters()
-    base_params.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
+    try:
+        detector = aruco.ArucoDetector(dictionary, params)
+        corners_list, ids, _ = detector.detectMarkers(gray)
+    except Exception:
+        corners_list, ids, _ = aruco.detectMarkers(gray, dictionary, parameters=params)
 
-    # Different parameter tweaks to try on the SAME gray image
-    trials = [
-        dict(adaptiveThreshWinSizeMin=3,  adaptiveThreshWinSizeMax=23, adaptiveThreshConstant=7.0),
-        dict(adaptiveThreshWinSizeMin=5,  adaptiveThreshWinSizeMax=35, adaptiveThreshConstant=7.0),
-        dict(adaptiveThreshWinSizeMin=7,  adaptiveThreshWinSizeMax=45, adaptiveThreshConstant=5.0),
-        dict(adaptiveThreshWinSizeMin=3,  adaptiveThreshWinSizeMax=23, adaptiveThreshConstant=3.0),
-    ]
+    info = {}
+    if ids is not None:
+        ids = ids.flatten()
+        for corners, i in zip(corners_list, ids):
+            if int(i) not in (0,1,2,3):
+                continue  # ignore stray tags
+            pts = corners.reshape(4, 2).astype(np.float32)
+            center = pts.mean(axis=0)
+            info[int(i)] = {"center": center, "corners": pts}
 
-    best_info = {}
-    last_ids = []
-
-    for trial_idx, trial in enumerate(trials, start=1):
-        params = aruco.DetectorParameters()
-        # copy base
-        params.cornerRefinementMethod = base_params.cornerRefinementMethod
-        # apply overrides
-        for k, v in trial.items():
-            setattr(params, k, v)
-
-        try:
-            detector = aruco.ArucoDetector(dictionary, params)
-            corners_list, ids, _ = detector.detectMarkers(gray)
-        except Exception:
-            corners_list, ids, _ = aruco.detectMarkers(gray, dictionary, parameters=params)
-
-        info = {}
-        if ids is not None:
-            ids_flat = ids.flatten()
-            last_ids = sorted(int(i) for i in ids_flat)
-            for corners, i in zip(corners_list, ids_flat):
-                i = int(i)
-                if i not in (0, 1, 2, 3):
-                    continue
-                pts = corners.reshape(4, 2).astype(np.float32)
-                center = pts.mean(axis=0)
-                info[i] = {"center": center, "corners": pts}
-        else:
-            last_ids = []
-
-        # If we got all four tags, we are done
-        if all(k in info for k in (0, 1, 2, 3)):
-            best_info = info
-            break
-
-        # Otherwise remember the best we saw so far (if you want)
-        if len(info) > len(best_info):
-            best_info = info
-
-    # debug overlay (optional, on the original image + last detection)
+    # debug overlay (optional)
     try:
         dbg = image_bgr.copy()
-        if last_ids:
-            # reconstruct corners_list & ids from best_info for drawing
-            corners_draw = [best_info[k]["corners"][None, :, :] for k in best_info]
-            ids_draw = np.array([[k] for k in best_info], dtype=np.int32)
+        if ids is not None:
             try:
-                aruco.drawDetectedMarkers(dbg, corners_draw, ids_draw)
+                aruco.drawDetectedMarkers(dbg, corners_list, ids.reshape(-1,1))
             except Exception:
-                aruco.drawDetectedMarkers(dbg, corners_draw)
-        for i, item in best_info.items():
+                aruco.drawDetectedMarkers(dbg, corners_list, ids)
+        for i, item in info.items():
             c = item["center"].astype(int)
-            cv2.putText(dbg, str(i), tuple(c),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            cv2.putText(dbg, str(i), tuple(c), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
         cv2.imwrite("debug_aruco.png", dbg)
     except Exception:
         pass
-
-    return best_info
-
+    return info
 
 # ------------------------------
 # HOMOGRAPHY
 def compute_homography_auto(info):
-    """
-    Compute homography using the *centres* of markers 0,1,2,3 and the known
-    physical layout:
-      - Board: BOARD_W_MM × BOARD_H_MM
-      - Marker centres offset: OFFSET_MM from each edge
-    Returns H_in2out (image px -> rectified px) and rectified size (w,h).
-    """
-    for k in (0, 1, 2, 3):
+    """Compute H and rectified size directly from marker geometry (no px/mm)."""
+    for k in (0,1,2,3):
         if k not in info:
             raise RuntimeError(f"Missing ArUco id {k}. Found {sorted(info.keys())}")
 
-    # Marker centres in input image pixels
-    TLc = info[0]["center"].astype(np.float32)  # top-left marker centre
-    TRc = info[1]["center"].astype(np.float32)  # top-right
-    BLc = info[2]["center"].astype(np.float32)  # bottom-left
-    BRc = info[3]["center"].astype(np.float32)  # bottom-right
+    # Map: TL=0, TR=1, BL=2, BR=3
+    centers = np.array([info[k]["center"] for k in (0,1,2,3)], dtype=np.float32)
+    board_center = centers.mean(axis=0)
 
-    # --- 1) Homography from board-mm coords (marker centres) -> input pixels ---
+    def inner_corner(id_):
+        pts = info[id_]["corners"]
+        d = np.linalg.norm(pts - board_center[None, :], axis=1)
+        return pts[np.argmin(d)]
 
-    # Marker centre positions in board coordinates (mm),
-    # with (0,0) at the *top-left board corner*.
-    pts_mm = np.float32([
-        [OFFSET_MM,                   OFFSET_MM                  ],  # TL marker
-        [BOARD_W_MM - OFFSET_MM,     OFFSET_MM                  ],  # TR marker
-        [OFFSET_MM,                   BOARD_H_MM - OFFSET_MM    ],  # BL marker
-        [BOARD_W_MM - OFFSET_MM,     BOARD_H_MM - OFFSET_MM    ],  # BR marker
-    ])
+    # inner corners in image px
+    TL = inner_corner(0)
+    TR = inner_corner(1)
+    BR = inner_corner(3)
+    BL = inner_corner(2)
 
-    pts_px = np.float32([
-        TLc,
-        TRc,
-        BLc,
-        BRc,
-    ])
+    width_px  = np.linalg.norm(TR - TL)
+    height_px = np.linalg.norm(BL - TL)
+    cell_px_w = width_px / W
+    cell_px_h = height_px / H
+    cell_px   = (cell_px_w + cell_px_h) / 2.0
 
-    H_mm2in, _ = cv2.findHomography(pts_mm, pts_px)
-    if H_mm2in is None:
-        raise RuntimeError("Homography mm->image failed")
-
-    # --- 2) Choose output scale (px per mm) from centre distances ---
-
-    # Horizontal px per mm from TL <-> TR
-    d_px_x = np.linalg.norm(TRc - TLc)
-    d_mm_x = BOARD_W_MM - 2.0 * OFFSET_MM
-    px_per_mm_x = d_px_x / d_mm_x if d_mm_x != 0 else 1.0
-
-    # Vertical px per mm from TL <-> BL
-    d_px_y = np.linalg.norm(BLc - TLc)
-    d_mm_y = BOARD_H_MM - 2.0 * OFFSET_MM
-    px_per_mm_y = d_px_y / d_mm_y if d_mm_y != 0 else 1.0
-
-    # Use the average so we don't distort aspect ratio too badly
-    S = float((px_per_mm_x + px_per_mm_y) * 0.5)
-
-    out_w = int(round(BOARD_W_MM * S))
-    out_h = int(round(BOARD_H_MM * S))
-
-    # --- 3) Homography from board-mm coords -> rectified pixel coords ---
-
-    board_corners_mm = np.float32([
-        [0.0,         0.0        ],          # top-left board corner
-        [BOARD_W_MM,  0.0        ],          # top-right
-        [BOARD_W_MM,  BOARD_H_MM ],          # bottom-right
-        [0.0,         BOARD_H_MM ],          # bottom-left
-    ])
+    out_w = int(round(W * cell_px))
+    out_h = int(round(H * cell_px))
 
     dst_pts = np.float32([
-        [0.0,    0.0   ],         # TL in rectified image
-        [out_w,  0.0   ],         # TR
-        [out_w,  out_h ],         # BR
-        [0.0,    out_h ],         # BL
+        [0,      0     ],   # TL
+        [out_w,  0     ],   # TR
+        [out_w,  out_h ],   # BR
+        [0,      out_h ],   # BL
     ])
-
-    H_mm2out, _ = cv2.findHomography(board_corners_mm, dst_pts)
-    if H_mm2out is None:
-        raise RuntimeError("Homography mm->rectified failed")
-
-    # --- 4) Combine to get input-px -> rectified-px homography ---
-
-    H_in2mm = np.linalg.inv(H_mm2in)
-    H_in2out = H_mm2out @ H_in2mm
-
-    return H_in2out.astype(np.float32), (out_w, out_h)
-
+    src_pts = np.float32([TL, TR, BR, BL])
+    Hmat, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 3.0)
+    if Hmat is None:
+        raise RuntimeError("Homography failed")
+    return Hmat, (out_w, out_h)
 
 def warp_board(image_bgr, Hmat, size):
     out_w, out_h = size
