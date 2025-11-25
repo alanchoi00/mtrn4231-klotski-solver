@@ -1,0 +1,19 @@
+<package format="2">
+  <name>ur_with_pizza_cutter_description</name>
+  <version>1.0.0</version>
+  <description>MTNR4231 UR5e robot arm with pizza cutter demo.</description>
+
+  <maintainer email="dennuguyen@gmail.com" />
+  
+  <author email="dennuguyen@gmail.com">Dan Nguyen</author>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>ur_description</depend>
+  <depend>pizza_cutter_description</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

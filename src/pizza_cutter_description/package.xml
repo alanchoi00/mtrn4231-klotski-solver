@@ -1,0 +1,20 @@
+<!-- Specifies dependencies and package configuration. -->
+<package format="2">
+  <!-- Name of project, make sure it is the same in CMakeLists.txt -->
+  <name>pizza_cutter_description</name>
+  <version>1.0.0</version>
+  <description>MTRN4231 lab 4 end effector demo.</description>
+
+  <maintainer email="dennuguyen@gmail.com" />
+  
+  <author email="dennuguyen@gmail.com">Dan Nguyen</author>
+  <license>BSD</license>
+
+  <!-- Find build tools that are required. -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Define a meta-package. -->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
