@@ -84,6 +84,9 @@ def rows_to_board(rows: List[str]) -> Board:
 
 class MockSense(Node):
     def __init__(self):
+        """
+        Usage: ros2 run pkg_sense mock_sense_node --ros-args -p mode:=rows -p rows:="3113/3113/.22./3443/3443" -p frame_id:=map
+        """
         super().__init__('mock_sense')
         self.ui_pub = self.create_publisher(String, '/ui/events', 10)
 

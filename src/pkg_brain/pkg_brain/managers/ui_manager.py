@@ -66,11 +66,11 @@ class UIManager:
             return
 
         brain.ctx.goal = msg
-        self.ui(f"Goal pattern received: {self._board_to_pattern(msg)}")
+        self.ui(f"Goal pattern received: {self.board_to_pattern(msg)}")
         brain.ctx.reset()
         brain.tick(TickSource.GOAL_UPDATE)
 
-    def _board_to_pattern(self, board: Board) -> str:
+    def board_to_pattern(self, board: Board) -> str:
         """Convert a Board message to a pattern string for display."""
         W = board.spec.cols
         H = board.spec.rows

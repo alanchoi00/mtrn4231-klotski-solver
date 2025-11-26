@@ -9,9 +9,11 @@ from klotski_interfaces.msg import Board, BoardState, Move
 from .ui_modes import UIMode
 
 
-class ExecutionPhase(IntEnum):
+class Phase(IntEnum):
     """Execution phases for the 5-step manipulation sequence."""
 
+    SENSE = -2      # BoardState: sensing phase
+    PLAN = -1       # MoveList: planning phase
     APPROACH = 0     # MovePiece: approach the piece
     GRIP_CLOSE = 1    # GripPiece: close gripper
     PICK_PLACE = 2   # MovePiece: pick and place piece
@@ -19,9 +21,11 @@ class ExecutionPhase(IntEnum):
     RETREAT = 4      # MovePiece: retreat to home position
 
     @classmethod
-    def get_name(cls, phase: ExecutionPhase | int) -> str:
+    def get_name(cls, phase: Phase | int) -> str:
         """Get human-readable name for phase."""
         names = {
+            cls.SENSE: "sense",
+            cls.PLAN: "plan",
             cls.APPROACH: "approach",
             cls.GRIP_OPEN: "grip_open",
             cls.PICK_PLACE: "pick_place",
@@ -33,6 +37,26 @@ class ExecutionPhase(IntEnum):
         except (ValueError, TypeError):
             return f"unknown({phase})"
         return names.get(key, f"unknown({phase})")
+
+    @classmethod
+    def get_start_phase(cls) -> 'Phase':
+        """Get the starting phase for execution."""
+        return cls.SENSE
+
+    @classmethod
+    def is_pre_execution_phase(cls, phase: int) -> bool:
+        """Check if phase is the pre-execution phase."""
+        return phase in (cls.SENSE, cls.PLAN)
+
+    @classmethod
+    def is_sense_phase(cls, phase: int) -> bool:
+        """Check if phase is the sensing phase."""
+        return phase == cls.SENSE
+
+    @classmethod
+    def is_plan_phase(cls, phase: int) -> bool:
+        """Check if phase is the planning phase."""
+        return phase == cls.PLAN
 
     @classmethod
     def is_grip_phase(cls, phase: int) -> bool:
@@ -50,7 +74,7 @@ class ExecutionPhase(IntEnum):
         return phase == cls.RETREAT
 
     @classmethod
-    def next_phase(cls, current_phase: int) -> 'ExecutionPhase | None':
+    def next_phase(cls, current_phase: int) -> 'Phase | None':
         """Get next phase safely, returns None if already at last phase."""
         if current_phase >= cls.RETREAT:
             return None
@@ -66,38 +90,7 @@ class TickSource(Enum):
     EXEC_FAILED = "exec_failed"
     EXEC_NEXT_PHASE = "exec_next_phase"
     EXEC_DONE = "exec_done"
-
-    @classmethod
-    def exec_related(cls) -> List[TickSource]:
-        """Tick sources that are related to execution."""
-        return [
-            TickSource.EXEC_FAILED,
-            TickSource.EXEC_NEXT_PHASE,
-            TickSource.EXEC_DONE,
-        ]
-
-    @classmethod
-    def exec_isolated(cls) -> List[TickSource]:
-        """Tick sources that are isolated to execution only."""
-        return [TickSource.EXEC_NEXT_PHASE]
-
-    @classmethod
-    def skip_sense(cls) -> List[TickSource]:
-        """Tick sources that should skip sensing."""
-        return [
-            TickSource.SENSE_DONE,
-            TickSource.BOARD_STATE,
-            TickSource.PLAN_DONE,
-            *cls.exec_isolated(),
-        ]
-
-    @classmethod
-    def skip_plan(cls) -> List[TickSource]:
-        """Tick sources that should skip planning."""
-        return [
-            TickSource.PLAN_DONE,
-            *cls.exec_isolated(),
-        ]
+    GOAL_REACHED = "goal_reached"
 
 
 @dataclass
@@ -117,21 +110,24 @@ class BrainContext:
 
     # Execution flags
     busy: bool = False           # currently sending action
-    current_phase: ExecutionPhase = ExecutionPhase.APPROACH  # current execution phase
+    current_phase: Phase = Phase.SENSE  # current execution phase
 
     # Book-keeping
     last_error: str = ""
     tick_source: TickSource | None = None        # who triggered last tick (debug/telemetry)
+
+    # goal reached flag
+    goal_reached: bool = False
 
     def reset(self):
         self.sensed = None
         self.plan.clear()
         self.plan_index = 0
         self.busy = False
-        self.current_phase = ExecutionPhase.APPROACH
-        self.revalidating = False
+        self.current_phase = Phase.SENSE
         self.last_error = ""
         self.mode = UIMode.PAUSE     # after reset, remain paused
+        self.goal_reached = False
 
     def get_last_executed_move(self) -> Optional[Move]:
         """Get the last executed move, if any."""
@@ -141,3 +137,6 @@ class BrainContext:
             return self.plan[self.plan_index - 1]
         except Exception:
             return None
+
+    def set_goal_reached(self, reached: bool) -> None:
+        self.goal_reached = reached

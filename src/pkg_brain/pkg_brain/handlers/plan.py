@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from klotski_interfaces.msg import Board
-from pkg_brain.context import TickSource
 
-from ..context import BrainContext
+from ..context import BrainContext, Phase
 from .base import BaseHandler, BrainNodeLike, HandlerResult
 from .status import HandlerStatus
 
@@ -11,9 +10,9 @@ from .status import HandlerStatus
 class PlanHandler(BaseHandler):
     name = "plan"
 
-    def handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
-        if ctx.tick_source in TickSource.skip_plan():
-            return HandlerResult(HandlerStatus.NEXT, f"skip planning due to tick source {ctx.tick_source}")
+    def do_handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
+        if not Phase.is_plan_phase(ctx.current_phase):
+            return HandlerResult(HandlerStatus.NEXT, f"not planning phase (current_phase={ctx.current_phase})")
 
         if ctx.goal is None:
             node.debug("[plan] No goal yet -> waiting")
@@ -29,14 +28,10 @@ class PlanHandler(BaseHandler):
                 return HandlerResult(HandlerStatus.DONE, "planner not available")
             return HandlerResult(HandlerStatus.PENDING, "planning")
 
-        # Initial planning
+        # No plan
         if ctx.plan is None or len(ctx.plan) == 0:
             node.debug("[plan] No plan yet -> requesting initial plan")
             return _request_plan("initial plan")
-
-        if ctx.plan_index == 0 and ctx.expected_board is None:
-            node.debug("[plan] No expected_board yet -> skipping replanning")
-            return HandlerResult(HandlerStatus.NEXT, "no expected_board (assume initial)")
 
         if ctx.expected_board is not None and self._boards_equal(ctx.sensed.board, ctx.expected_board):
             node.debug("[plan] Sensed matches expected -> no replanning needed")

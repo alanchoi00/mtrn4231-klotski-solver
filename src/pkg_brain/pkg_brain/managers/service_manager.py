@@ -9,7 +9,7 @@ from rclpy.task import Future
 from klotski_interfaces.msg import Board, Cell, Move, MoveList
 from klotski_interfaces.srv import CaptureBoard, SolveBoard
 
-from ..context import ExecutionPhase, TickSource
+from ..context import Phase, TickSource
 
 
 class ServiceManager:
@@ -58,7 +58,13 @@ class ServiceManager:
             brain.ctx.sensed = res.state
             self._ui(f"[sense] Captured board: {len(res.state.board.pieces)} pieces")
             # New sensing invalidates plan to trigger replanning
-            brain.ctx.plan.clear()
+            next_phase = Phase.next_phase(brain.ctx.current_phase.value)
+            if next_phase is not None:
+                brain.ctx.current_phase = next_phase
+                brain.get_logger().debug(f"[sense] Advanced to next phase {brain.ctx.current_phase} after sensing")
+            else:
+                brain.get_logger().warn(f"[sense] No next phase from current_phase={brain.ctx.current_phase}")
+                raise RuntimeError("Invalid execution phase transition")
             brain.tick(TickSource.SENSE_DONE)
         else:
             self._ui(f"[sense] Capture failed: {res.note}")
@@ -152,7 +158,7 @@ class ServiceManager:
                 raise RuntimeError("No response received from /plan/solve")
         except Exception as e:
             brain.ctx.last_error = f"Plan failed: {e}"
-            self.node.get_logger().warn(brain.ctx.last_error)
+            brain.debug(brain.ctx.last_error)
             self._ui("[plan] Failed (see logs)")
             # Leave ctx.plan as-is; stay paused
             return
@@ -160,12 +166,21 @@ class ServiceManager:
         move_list: MoveList = res.plan
         brain.ctx.plan = list(move_list.moves)
         brain.ctx.plan_index = 0
-        brain.ctx.current_phase = ExecutionPhase.APPROACH  # Reset to first phase
-        brain.get_logger().debug(f"[plan] Reseted plan_index {brain.ctx.plan_index} and current_phase {brain.ctx.current_phase} after receiving plan {len(brain.ctx.plan)} moves")
+        brain.debug(f"[plan] Reseted plan_index {brain.ctx.plan_index} after receiving plan {len(brain.ctx.plan)} moves")
 
-        if len(brain.ctx.plan) != 0:
-            self._ui(f"[plan] Received plan: {len(brain.ctx.plan)} move(s), solved={res.solved}")
+        if len(brain.ctx.plan) == 0 and res.solved:
+            self._ui(f"[plan] Solved: no moves needed (already at goal)")
+            brain.ctx.set_goal_reached(True)
+            brain.tick(TickSource.GOAL_REACHED)
+            return
 
+        if len(brain.ctx.plan) != 0 and not res.solved:
+            self._ui(f"[plan] Warning: received plan with moves but solver indicates unsolved")
+            raise RuntimeError("Inconsistent plan result from solver")
+
+        self._ui(f"[plan] Received plan: {len(brain.ctx.plan)} move(s), solved={res.solved}")
+        brain.ctx.current_phase = Phase.APPROACH
+        brain.ctx.set_goal_reached(False)
         brain.tick(TickSource.PLAN_DONE)
 
     def _ui(self, msg: str) -> None:

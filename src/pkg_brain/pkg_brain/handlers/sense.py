@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..context import BrainContext, TickSource
+from ..context import BrainContext, Phase
 from .base import BaseHandler, BrainNodeLike, HandlerResult
 from .status import HandlerStatus
 
@@ -8,10 +8,10 @@ from .status import HandlerStatus
 class SenseHandler(BaseHandler):
     name = "sense"
 
-    def handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
+    def do_handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
 
-        if ctx.tick_source in TickSource.skip_sense():
-            return HandlerResult(HandlerStatus.NEXT, f"skip sense for tick_source={ctx.tick_source}")
+        if not Phase.is_sense_phase(ctx.current_phase):
+            return HandlerResult(HandlerStatus.NEXT, f"not sensing phase (current_phase={ctx.current_phase})")
 
         ok = node.start_sense()
         if not ok:
