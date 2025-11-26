@@ -277,7 +277,7 @@ class ActionExecutor:
 
             # Continue in AUTO; pause in STEP
             if brain.ctx.mode == UIMode.AUTO:
-                # Continue next move after 10 second delay
+                # Continue next move after configurable delay (brain.delay_secs seconds)
                 self._ui(f"[exec] Scheduling next phase {Phase.get_name(brain.ctx.current_phase)} in AUTO mode after {brain.delay_secs} seconds")
                 def _callback_exec_done():
                     if brain.exec_timer is not None:
