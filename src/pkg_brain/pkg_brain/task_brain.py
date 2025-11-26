@@ -97,10 +97,14 @@ class TaskBrain(Node):
             self.exec_timer = None
 
         def timer_callback():
-            callback()
-            if self.exec_timer is not None:
-                self.exec_timer.cancel()
-                self.exec_timer = None
+            try:
+                callback()
+            except Exception as e:
+                self.get_logger().error(f"[exec] Error in delayed callback: {e}")
+            finally:
+                if self.exec_timer is not None:
+                    self.exec_timer.cancel()
+                    self.exec_timer = None
 
         self.exec_timer = self.create_timer(delay_sec, timer_callback)
 
