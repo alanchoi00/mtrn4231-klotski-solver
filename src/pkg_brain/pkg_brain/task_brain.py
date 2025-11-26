@@ -39,7 +39,7 @@ class TaskBrain(Node):
 
         # Initialize context
         self.ctx = BrainContext()
-        self._exec_timer: Optional[Timer] = None
+        self.exec_timer: Optional[Timer] = None
 
         self.delay_secs: float = self.get_parameter("delay_secs").value or 0.0
 
@@ -92,17 +92,17 @@ class TaskBrain(Node):
     def callback_after_delay(self, delay_sec: float, callback: Callable) -> None:
         """Invoke callback after a delay in seconds."""
         # Cancel any previous EXEC_DONE timer
-        if self._exec_timer is not None:
-            self._exec_timer.cancel()
-            self._exec_timer = None
+        if self.exec_timer is not None:
+            self.exec_timer.cancel()
+            self.exec_timer = None
 
         def timer_callback():
             callback()
-            if self._exec_timer is not None:
-                self._exec_timer.cancel()
-                self._exec_timer = None
+            if self.exec_timer is not None:
+                self.exec_timer.cancel()
+                self.exec_timer = None
 
-        self._exec_timer = self.create_timer(delay_sec, timer_callback)
+        self.exec_timer = self.create_timer(delay_sec, timer_callback)
 
 
 def main() -> None:

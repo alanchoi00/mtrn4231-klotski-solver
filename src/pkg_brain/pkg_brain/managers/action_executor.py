@@ -280,9 +280,9 @@ class ActionExecutor:
                 # Continue next move after 10 second delay
                 self._ui(f"[exec] Scheduling next phase {Phase.get_name(brain.ctx.current_phase)} in AUTO mode after {brain.delay_secs} seconds")
                 def _callback_exec_done():
-                    if brain._exec_timer is not None:
-                        brain._exec_timer.cancel()
-                        brain._exec_timer = None
+                    if brain.exec_timer is not None:
+                        brain.exec_timer.cancel()
+                        brain.exec_timer = None
 
                     # Don’t auto-advance if user has paused or process is busy
                     if brain.ctx.mode == UIMode.AUTO and not brain.ctx.busy:
