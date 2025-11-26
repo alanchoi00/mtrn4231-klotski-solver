@@ -176,6 +176,8 @@ class ServiceManager:
 
         if len(brain.ctx.plan) != 0 and not res.solved:
             self._ui(f"[plan] Warning: received plan with moves but solver indicates unsolved")
+            # If the solver returns moves but does not mark the board as solved,
+            # this is treated as an error.
             raise RuntimeError("Inconsistent plan result from solver")
 
         self._ui(f"[plan] Received plan: {len(brain.ctx.plan)} move(s), solved={res.solved}")
