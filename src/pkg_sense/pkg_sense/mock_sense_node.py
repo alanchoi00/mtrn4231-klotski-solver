@@ -128,7 +128,6 @@ class MockSense(Node):
 
         state = BoardState()
         state.board = board
-        state.board_pose_map.header.frame_id = frame_id
         # (You can fill a fixed pose if useful; leaving zeros is fine for a mock)
 
         res.state = state
