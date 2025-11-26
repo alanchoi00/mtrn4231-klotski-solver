@@ -52,6 +52,10 @@ def generate_launch_description():
         FindPackageShare('pkg_brain'), 'launch', 'brain.launch.py'
     ])
 
+    sense_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_sense'), 'launch', 'sense.launch.py'
+    ])
+
     # UR5e launches
     ur_control_launch = PathJoinSubstitution([
         FindPackageShare('ur_robot_driver'), 'launch', 'ur_control.launch.py'
@@ -145,6 +149,10 @@ def generate_launch_description():
 
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(plan_launch),
+                ),
+
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(sense_launch),
                 ),
 
                 IncludeLaunchDescription(
