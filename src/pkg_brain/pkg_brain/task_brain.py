@@ -5,7 +5,7 @@ from rclpy.node import Node
 
 from klotski_interfaces.msg import BoardState
 
-from .context import BrainContext
+from .context import BrainContext, TickSource
 from .managers import (ActionExecutor, PipelineOrchestrator, ServiceManager,
                        UIManager)
 
@@ -43,10 +43,9 @@ class TaskBrain(Node):
         self.ctx.sensed = state
         self.ui_manager.ui(f"BoardState received: {len(state.board.pieces)} pieces")
         # sensing updated -> invalidate plan to trigger replanning
-        self.ctx.plan_received = False
-        self.tick("board_state")
+        self.tick(TickSource.BOARD_STATE)
 
-    def tick(self, source: str) -> None:
+    def tick(self, source: TickSource) -> None:
         """Delegate to pipeline orchestrator."""
         self.pipeline_orchestrator.tick(source)
 

@@ -11,7 +11,7 @@ class ExecuteHandler(BaseHandler):
 
     def handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
         # Only execute if we have received a plan
-        if not ctx.plan_received:
+        if ctx.plan is None or len(ctx.plan) == 0:
             return HandlerResult(HandlerStatus.DONE, "no plan")
 
         if ctx.plan_index >= len(ctx.plan):

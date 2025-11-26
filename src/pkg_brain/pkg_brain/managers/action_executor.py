@@ -9,7 +9,7 @@ from rclpy.task import Future
 from klotski_interfaces.action import GripPiece, MovePiece
 from klotski_interfaces.msg import Move
 
-from ..context import ExecutionPhase
+from ..context import ExecutionPhase, TickSource
 from ..ui_modes import UIMode
 
 
@@ -204,7 +204,7 @@ class ActionExecutor:
             phase_name = ExecutionPhase.get_name(brain.ctx.current_phase)
             self._ui(f"[exec] MovePiece {phase_name} FAILED -> pause")
             brain.ctx.mode = UIMode.PAUSE
-            brain.tick("exec_failed")
+            brain.tick(TickSource.EXEC_FAILED)
 
     def _on_grip_result(self, res_fut: Future) -> None:
         """Handle grip action result."""
@@ -229,7 +229,7 @@ class ActionExecutor:
             phase_name = ExecutionPhase.get_name(brain.ctx.current_phase)
             self._ui(f"[exec] GripPiece {phase_name} FAILED -> pause")
             brain.ctx.mode = UIMode.PAUSE
-            brain.tick("exec_failed")
+            brain.tick(TickSource.EXEC_FAILED)
 
     def _advance_to_next_phase(self) -> None:
         """Advance to the next phase or complete the move."""
@@ -239,14 +239,15 @@ class ActionExecutor:
             return
 
         next_phase = ExecutionPhase.next_phase(brain.ctx.current_phase)
+        self.node.get_logger().debug(f"[exec] Advancing from phase {ExecutionPhase.get_name(brain.ctx.current_phase)} to {ExecutionPhase.get_name(next_phase) if next_phase is not None else 'complete move'}")
         if next_phase is not None:
             # Continue to next phase
             brain.ctx.current_phase = next_phase
             if brain.ctx.mode == UIMode.AUTO:
-                brain.tick("exec_next_phase")
+                brain.tick(TickSource.EXEC_NEXT_PHASE)
             elif brain.ctx.mode == UIMode.STEP:
                 brain.ctx.mode = UIMode.PAUSE
-                brain.tick("exec_phase_done")
+                brain.tick(TickSource.EXEC_NEXT_PHASE)
         else:
             # All 5 phases complete
             self._ui(f"[exec] All phases complete for move {brain.ctx.plan_index + 1}/{len(brain.ctx.plan)}")
@@ -255,10 +256,10 @@ class ActionExecutor:
 
             # Continue in AUTO; pause in STEP
             if brain.ctx.mode == UIMode.AUTO:
-                brain.tick("exec_next_auto")
+                brain.tick(TickSource.EXEC_DONE)
             elif brain.ctx.mode == UIMode.STEP:
                 brain.ctx.mode = UIMode.PAUSE
-                brain.tick("exec_step_done")
+                brain.tick(TickSource.EXEC_DONE)
 
     def _ui(self, msg: str) -> None:
         """Send UI message via brain's UI manager."""

@@ -134,7 +134,7 @@ class MockSense(Node):
 
         # also publish on /board_state to help your existing brain flow
         self.state_pub.publish(state)
-        self._ui("SENSE: published /board_state (mock)")
+        self._ui(f"(mock) SENSE: published /board_state (rows={[''.join(str(c) for c in r) for r in rows]})")
         return res
 
     def _ui(self, text: str):

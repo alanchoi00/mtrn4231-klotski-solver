@@ -11,5 +11,6 @@ def generate_launch_description():
             executable='task_brain',
             name='task_brain',
             output='screen',
+            arguments=['--ros-args', '--log-level', 'debug'],
         ),
     ])

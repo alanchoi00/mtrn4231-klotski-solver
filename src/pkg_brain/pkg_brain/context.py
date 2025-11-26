@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import List, Optional
 
 from klotski_interfaces.msg import Board, BoardState, Move
@@ -19,7 +19,7 @@ class ExecutionPhase(IntEnum):
     RETREAT = 4      # MovePiece: retreat to home position
 
     @classmethod
-    def get_name(cls, phase: int) -> str:
+    def get_name(cls, phase: ExecutionPhase | int) -> str:
         """Get human-readable name for phase."""
         names = {
             cls.APPROACH: "approach",
@@ -28,7 +28,11 @@ class ExecutionPhase(IntEnum):
             cls.GRIP_CLOSE: "grip_close",
             cls.RETREAT: "retreat"
         }
-        return names.get(phase, f"unknown({phase})")
+        try:
+            key = cls(phase)
+        except (ValueError, TypeError):
+            return f"unknown({phase})"
+        return names.get(key, f"unknown({phase})")
 
     @classmethod
     def is_grip_phase(cls, phase: int) -> bool:
@@ -52,6 +56,49 @@ class ExecutionPhase(IntEnum):
             return None
         return cls(current_phase + 1)
 
+class TickSource(Enum):
+    """Source that can trigger a pipeline tick."""
+    BOARD_STATE = "board_state"
+    PLAN_DONE = "plan_done"
+    SENSE_DONE = "sense_done"
+    UI_COMMAND = "ui_command"
+    GOAL_UPDATE = "goal_update"
+    EXEC_FAILED = "exec_failed"
+    EXEC_NEXT_PHASE = "exec_next_phase"
+    EXEC_DONE = "exec_done"
+
+    @classmethod
+    def exec_related(cls) -> List[TickSource]:
+        """Tick sources that are related to execution."""
+        return [
+            TickSource.EXEC_FAILED,
+            TickSource.EXEC_NEXT_PHASE,
+            TickSource.EXEC_DONE,
+        ]
+
+    @classmethod
+    def exec_isolated(cls) -> List[TickSource]:
+        """Tick sources that are isolated to execution only."""
+        return [TickSource.EXEC_NEXT_PHASE]
+
+    @classmethod
+    def skip_sense(cls) -> List[TickSource]:
+        """Tick sources that should skip sensing."""
+        return [
+            TickSource.SENSE_DONE,
+            TickSource.BOARD_STATE,
+            TickSource.PLAN_DONE,
+            *cls.exec_isolated(),
+        ]
+
+    @classmethod
+    def skip_plan(cls) -> List[TickSource]:
+        """Tick sources that should skip planning."""
+        return [
+            TickSource.PLAN_DONE,
+            *cls.exec_isolated(),
+        ]
+
 
 @dataclass
 class BrainContext:
@@ -59,10 +106,11 @@ class BrainContext:
     goal: Optional[Board] = None
     sensed: Optional[BoardState] = None
 
+    expected_board: Optional[Board] = None  # expected board after last move
+
     # Planning
     plan: List[Move] = field(default_factory=list)
     plan_index: int = 0          # next move to execute
-    plan_received: bool = False  # flag to distinguish no plan vs empty plan
 
     # Modes: UICommand constants (IDLE | AUTO | STEP | PAUSE)
     mode: int = UIMode.IDLE
@@ -73,14 +121,23 @@ class BrainContext:
 
     # Book-keeping
     last_error: str = ""
-    tick_source: str = ""        # who triggered last tick (debug/telemetry)
+    tick_source: TickSource | None = None        # who triggered last tick (debug/telemetry)
 
     def reset(self):
         self.sensed = None
         self.plan.clear()
         self.plan_index = 0
-        self.plan_received = False
         self.busy = False
         self.current_phase = ExecutionPhase.APPROACH
+        self.revalidating = False
         self.last_error = ""
         self.mode = UIMode.PAUSE     # after reset, remain paused
+
+    def get_last_executed_move(self) -> Optional[Move]:
+        """Get the last executed move, if any."""
+        if self.plan_index == 0:
+            return None
+        try:
+            return self.plan[self.plan_index - 1]
+        except Exception:
+            return None
