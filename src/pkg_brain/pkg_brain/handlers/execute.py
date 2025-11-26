@@ -45,7 +45,7 @@ class ExecuteHandler(BaseHandler):
                 else:
                     # All phases complete for this move
                     ctx.plan_index += 1
-                    ctx.current_phase = Phase.APPROACH
+                    ctx.current_phase = Phase.get_start_phase()
                 ctx.mode = UIMode.PAUSE
                 return HandlerResult(HandlerStatus.DONE, "skipped one phase (not implemented)")
 
