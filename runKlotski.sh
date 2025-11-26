@@ -12,6 +12,6 @@ gnome-terminal --title="Dashboard" -- bash -lc "cd \"$SCRIPT_DIR/src/dashboard_a
 
 sleep 5
 
-source \"$SCRIPT_DIR/install/setup.bash\"
+source "$SCRIPT_DIR/install/setup.bash"
 
 ros2 launch src/launch/klotski.launch.py sim:=false
