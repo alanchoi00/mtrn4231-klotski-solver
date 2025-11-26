@@ -273,7 +273,7 @@ class ActionExecutor:
             self._ui(f"[exec] All phases complete for move {brain.ctx.plan_index + 1}/{len(brain.ctx.plan)}")
             brain.ctx.plan_index += 1
             brain.ctx.current_phase = Phase.get_start_phase()  # Reset for revalidation
-            self.node.get_logger().debug(f"[exec] Reseted current_phase to {brain.ctx.current_phase} and advanced plan_index to {brain.ctx.plan_index}")
+            self.node.get_logger().debug(f"[exec] Reset current_phase to {brain.ctx.current_phase} and advanced plan_index to {brain.ctx.plan_index}")
 
             # Continue in AUTO; pause in STEP
             if brain.ctx.mode == UIMode.AUTO:
