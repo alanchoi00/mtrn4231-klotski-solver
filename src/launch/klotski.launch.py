@@ -4,7 +4,7 @@ from launch_ros.substitutions import FindPackageShare
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
                             TimerAction)
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -22,6 +22,7 @@ def generate_launch_description():
     """
     # Launch configurations
     start_rosbridge = LaunchConfiguration('start_rosbridge')
+    sim = LaunchConfiguration('sim')
 
     # Klotski component launches
     manip_launch = PathJoinSubstitution([
@@ -90,6 +91,7 @@ def generate_launch_description():
 
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(sense_launch),
+                    condition=UnlessCondition(sim), # Only start sensing in real robot mode
                 ),
 
                 IncludeLaunchDescription(
