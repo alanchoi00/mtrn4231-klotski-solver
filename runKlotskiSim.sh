@@ -46,7 +46,7 @@ fi
 
 sleep 5
 
-source \"$SCRIPT_DIR/install/setup.bash\"
+source "$SCRIPT_DIR/install/setup.bash"
 
 ros2 launch src/launch/klotski.launch.py sim:=true
 
