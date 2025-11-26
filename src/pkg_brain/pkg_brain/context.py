@@ -27,9 +27,9 @@ class Phase(IntEnum):
             cls.SENSE: "sense",
             cls.PLAN: "plan",
             cls.APPROACH: "approach",
-            cls.GRIP_OPEN: "grip_open",
-            cls.PICK_PLACE: "pick_place",
             cls.GRIP_CLOSE: "grip_close",
+            cls.PICK_PLACE: "pick_place",
+            cls.GRIP_OPEN: "grip_open",
             cls.RETREAT: "retreat"
         }
         try:
