@@ -56,7 +56,7 @@ class ServiceManager:
             last_move = brain.ctx.get_last_executed_move()
             brain.ctx.expected_board = self._derive_expected_board(last_sensed_board, last_move)
             brain.ctx.sensed = res.state
-            self._ui(f"[sense] Captured board: {len(res.state.board.pieces)} pieces")
+            self._ui(f"[sense] Captured board: {brain.ui_manager.board_to_pattern(res.state.board)} with {len(res.state.board.pieces)} pieces")
             # New sensing invalidates plan to trigger replanning
             next_phase = Phase.next_phase(brain.ctx.current_phase.value)
             if next_phase is not None:
