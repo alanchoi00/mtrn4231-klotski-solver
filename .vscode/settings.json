@@ -188,18 +188,18 @@
   "C_Cpp_Runner.useLinkTimeOptimization": false,
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
   "python.autoComplete.extraPaths": [
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/pkg_sense/lib/python3.10/site-packages",
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/pkg_manipulation/local/lib/python3.10/dist-packages",
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/pkg_brain/lib/python3.10/site-packages",
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "${workspaceFolder}/install/pkg_sense/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/pkg_manipulation/local/lib/python3.10/dist-packages",
+    "${workspaceFolder}/install/pkg_brain/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/klotski_interfaces/local/lib/python3.10/dist-packages",
     "/opt/ros/humble/lib/python3.10/site-packages",
     "/opt/ros/humble/local/lib/python3.10/dist-packages"
   ],
   "python.analysis.extraPaths": [
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/pkg_sense/lib/python3.10/site-packages",
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/pkg_manipulation/local/lib/python3.10/dist-packages",
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/pkg_brain/lib/python3.10/site-packages",
-    "/home/alanchoi/dev/mtrn4231-klotski-solver/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "${workspaceFolder}/install/pkg_sense/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/pkg_manipulation/local/lib/python3.10/dist-packages",
+    "${workspaceFolder}/install/pkg_brain/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/klotski_interfaces/local/lib/python3.10/dist-packages",
     "/opt/ros/humble/lib/python3.10/site-packages",
     "/opt/ros/humble/local/lib/python3.10/dist-packages"
   ],
