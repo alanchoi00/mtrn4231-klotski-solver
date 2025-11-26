@@ -30,6 +30,7 @@ class TaskBrain(Node):
 
         self.declare_parameter(
             "delay_secs",
+            0.0,
             descriptor=ParameterDescriptor(
                 type=rclpy.Parameter.Type.DOUBLE.value,
                 description="Delay in seconds after move completion (retreat)",
@@ -41,7 +42,7 @@ class TaskBrain(Node):
         self.ctx = BrainContext()
         self.exec_timer: Optional[Timer] = None
 
-        self.delay_secs: float = self.get_parameter("delay_secs").value or 0.0
+        self.delay_secs: float = self.get_parameter("delay_secs").get_parameter_value().double_value
 
         # Initialize managers
         self.ui_manager = UIManager(self)
