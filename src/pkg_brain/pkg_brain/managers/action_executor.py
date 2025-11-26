@@ -273,11 +273,11 @@ class ActionExecutor:
             self._ui(f"[exec] All phases complete for move {brain.ctx.plan_index + 1}/{len(brain.ctx.plan)}")
             brain.ctx.plan_index += 1
             brain.ctx.current_phase = Phase.get_start_phase()  # Reset for revalidation
-            self.node.get_logger().debug(f"[exec] Reseted current_phase to {brain.ctx.current_phase} and advanced plan_index to {brain.ctx.plan_index}")
+            self.node.get_logger().debug(f"[exec] Reset current_phase to {brain.ctx.current_phase} and advanced plan_index to {brain.ctx.plan_index}")
 
             # Continue in AUTO; pause in STEP
             if brain.ctx.mode == UIMode.AUTO:
-                # Continue next move after 10 second delay
+                # Continue next move after configurable delay (brain.delay_secs seconds)
                 self._ui(f"[exec] Scheduling next phase {Phase.get_name(brain.ctx.current_phase)} in AUTO mode after {brain.delay_secs} seconds")
                 def _callback_exec_done():
                     if brain.exec_timer is not None:

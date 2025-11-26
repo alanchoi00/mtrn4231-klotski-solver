@@ -91,7 +91,7 @@ def generate_launch_description():
 
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(sense_launch),
-                    condition=UnlessCondition(sim), # Only start sensing in real robot mode
+                    condition=UnlessCondition(sim),  # Only start sensing in real robot mode
                 ),
 
                 IncludeLaunchDescription(

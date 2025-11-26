@@ -166,7 +166,7 @@ class ServiceManager:
         move_list: MoveList = res.plan
         brain.ctx.plan = list(move_list.moves)
         brain.ctx.plan_index = 0
-        brain.debug(f"[plan] Reseted plan_index {brain.ctx.plan_index} after receiving plan {len(brain.ctx.plan)} moves")
+        brain.debug(f"[plan] Reset plan_index {brain.ctx.plan_index} after receiving plan {len(brain.ctx.plan)} moves")
 
         if len(brain.ctx.plan) == 0 and res.solved:
             self._ui(f"[plan] Solved: no moves needed (already at goal)")
