@@ -36,6 +36,10 @@ def generate_launch_description():
         FindPackageShare('pkg_brain'), 'launch', 'brain.launch.py'
     ])
 
+    sense_launch = PathJoinSubstitution([
+        FindPackageShare('pkg_sense'), 'launch', 'sense.launch.py'
+    ])
+
     ur_moveit_launch = PathJoinSubstitution([
         FindPackageShare('ur_moveit_config'), 'launch', 'ur_moveit.launch.py'
     ])
@@ -82,6 +86,10 @@ def generate_launch_description():
 
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(plan_launch),
+                ),
+
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(sense_launch),
                 ),
 
                 IncludeLaunchDescription(

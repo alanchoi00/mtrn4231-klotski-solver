@@ -1,5 +1,7 @@
 arm_manipulator:
   ros__parameters:
+    # tf_node
+    use_dynamic_board_pose: true  # 启用从/board_pose话题更新位姿
     # MoveIt planning parameters - Optimized for speed while maintaining quality
     planning_time: 10.0 # (s)
     num_planning_attempts: 5

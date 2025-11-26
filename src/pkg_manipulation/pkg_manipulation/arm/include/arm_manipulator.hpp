@@ -231,6 +231,15 @@ class ArmManipulator : public rclcpp::Node {
   bool planAndExecuteSmoothedMotion(
       const geometry_msgs::msg::PoseStamped& target_pose,
       bool use_constraints = false);
+
+  /*tf_node*/
+  double board_rotation_yaw_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr
+      board_pose_sub_;
+  bool use_dynamic_board_pose_;
+
+  void board_pose_callback(
+      const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 };
 
 }  // namespace pkg_manipulation

@@ -54,3 +54,6 @@ CATKIN_IGNORE
 
 # Don't ignore everything in dashboard_app folder
 !src/dashboard_app/**
+
+# Ignore DS_Store's
+.DS_Store
