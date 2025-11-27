@@ -7,7 +7,7 @@ gnome-terminal --title="MoveitServer" -- bash -c \
     ur_type:=ur5e \
     launch_rviz:=true \
     use_fake_hardware:=true \
-    description_package:=ur_with_pizza_cutter_description \
-    description_file:=ur_with_pizza_cutter.xacro; \
+    description_package:=ur_with_gripper_description \
+    description_file:=ur_with_gripper.xacro; \
     exec bash'
 

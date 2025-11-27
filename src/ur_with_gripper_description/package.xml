@@ -1,7 +1,7 @@
 <package format="2">
-  <name>ur_with_pizza_cutter_description</name>
+  <name>ur_with_gripper_description</name>
   <version>1.0.0</version>
-  <description>MTNR4231 UR5e robot arm with pizza cutter demo.</description>
+  <description>MTNR4231 UR5e robot arm with gripper.</description>
 
   <maintainer email="dennuguyen@gmail.com" />
   
@@ -11,7 +11,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>ur_description</depend>
-  <depend>pizza_cutter_description</depend>
+  <depend>gripper_description</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

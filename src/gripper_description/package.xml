@@ -1,7 +1,7 @@
 <!-- Specifies dependencies and package configuration. -->
 <package format="2">
   <!-- Name of project, make sure it is the same in CMakeLists.txt -->
-  <name>pizza_cutter_description</name>
+  <name>gripper_description</name>
   <version>1.0.0</version>
   <description>MTRN4231 lab 4 end effector demo.</description>
 

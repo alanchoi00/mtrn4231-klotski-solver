@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<robot name="ur_with_pizza_cutter" xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot name="ur_with_gripper" xmlns:xacro="http://www.ros.org/wiki/xacro" >
 
   <!-- UR5e robot arm -->
   <!-- URDF won't build if following args aren't defined. -->
@@ -8,10 +8,10 @@
   <xacro:include filename="$(find ur_description)/urdf/ur.urdf.xacro"/>
 
   <!-- end effector -->
-  <xacro:include filename="$(find pizza_cutter_description)/urdf/pizza_cutter.urdf" />
+  <xacro:include filename="$(find gripper_description)/urdf/gripper.urdf" />
 
   <!-- Coupler between arm and end effector -->
-  <joint name="ur5_pizza_cutter_coupler_joint" type="fixed">
+  <joint name="ur5_gripper_coupler_joint" type="fixed">
     <parent link="tool0"/>
     <child link="gripper_base"/>
   </joint>
