@@ -36,7 +36,7 @@ BOARD_FRAME_NAME = "klotski_board"           # board frame (bottom-left of board
 HSV_RANGES = {
     "red1":   ((0,   100,  80), (10,  255, 255)),
     "red2":   ((170, 100,  80), (180, 255, 255)),
-    "yellow": ((27, 59, 118), (79,  190, 255)),
+    "yellow": ((21, 95, 35), (35,  255, 255)),
     "green":  ((44,   32,  76), (94,  255, 255)),
     "blue":   ((95,   198,  0), (130, 255, 156)),
     "grey":   ((0,     0,  50), (180,  70, 230)),   # low-saturation greys
