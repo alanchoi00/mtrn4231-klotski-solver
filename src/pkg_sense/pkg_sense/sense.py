@@ -36,7 +36,7 @@ BOARD_FRAME_NAME = "klotski_board"           # board frame (bottom-left of board
 HSV_RANGES = {
     "red1":   ((0,   100,  80), (10,  255, 255)),
     "red2":   ((170, 100,  80), (180, 255, 255)),
-    "yellow": ((27, 59, 118), (79,  190, 255)),
+    "yellow": ((21, 95, 35), (35,  255, 255)),
     "green":  ((44,   32,  76), (94,  255, 255)),
     "blue":   ((95,   198,  0), (130, 255, 156)),
     "grey":   ((0,     0,  50), (180,  70, 230)),   # low-saturation greys
@@ -384,7 +384,7 @@ class Sense(Node):
             CameraInfo, '/camera/camera/aligned_depth_to_color/camera_info', self.arm_image_depth_info_callback, 10
         )
 
-        self.declare_parameter('frame_id', 'map')   # frame where you want marker_pose (e.g. map/base_link)
+        self.declare_parameter('frame_id', 'base_link')   # world frame for Klotski system
 
         # Publishers
         self.ui_pub = self.create_publisher(String, '/ui/events', 10)
@@ -644,3 +644,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
