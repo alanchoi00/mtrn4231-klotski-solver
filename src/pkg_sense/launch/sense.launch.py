@@ -10,7 +10,7 @@ def generate_launch_description():
             name='sense',
             output='screen',
             parameters=[{
-                'frame_id': 'map'
+                'frame_id': 'base_link',
             }]
         ),
 

@@ -384,7 +384,7 @@ class Sense(Node):
             CameraInfo, '/camera/camera/aligned_depth_to_color/camera_info', self.arm_image_depth_info_callback, 10
         )
 
-        self.declare_parameter('frame_id', 'map')   # frame where you want marker_pose (e.g. map/base_link)
+        self.declare_parameter('frame_id', 'base_link')   # world frame for Klotski system
 
         # Publishers
         self.ui_pub = self.create_publisher(String, '/ui/events', 10)
