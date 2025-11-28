@@ -18,6 +18,7 @@ from geometry_msgs.msg import TransformStamped, PoseStamped
 from klotski_interfaces.msg import Board, BoardSpec, BoardState, Cell, Piece
 from klotski_interfaces.srv import CaptureBoard
 from tf2_geometry_msgs import do_transform_pose
+from builtin_interfaces.msg import Time
 
 # ------------------------------
 # CONFIG
@@ -840,29 +841,11 @@ class Sense(Node):
         # Build Board
         board_msg = grid_to_board(grid, rectified_size_px=(size[0], size[1]))
 
-        # --- marker_pose[] as markers 0–3 in CAMERA_LINK_FRAME (camera_link) ---
-        marker_poses_out = []
-        target_frame = CAMERA_LINK_FRAME
-
-        for mid in (0, 1, 2, 3):
-            if mid not in marker_data_cam:
-                continue
-            pose_cam = marker_data_cam[mid]["pose"]
-            try:
-                pose_out = self.tf_buffer.transform(
-                    pose_cam,
-                    target_frame,
-                    timeout=Duration(seconds=0.2)
-                )
-                marker_poses_out.append(pose_out)
-            except Exception as e:
-                self.get_logger().warn(f"Failed to transform marker {mid} pose to {target_frame}: {e}")
-
         # Build BoardState
         state_msg = BoardState()
         state_msg.stamp = now_stamp
         state_msg.board = board_msg
-        state_msg.marker_pose = marker_poses_out
+        state_msg.board_pose = self._get_board_pose(now_stamp)
 
         counts_ok = validate_counts(grid, board_msg, self.get_logger())
 
@@ -873,6 +856,41 @@ class Sense(Node):
         response.ok = bool(counts_ok)
         response.note = "Captured" if counts_ok else "Captured, but piece counts invalid (want 4B,1R,1G,4Y,2 empty)"
         return response
+    
+    def _get_board_pose(self, now_stamp: Time):
+        # Compute board pose in base frame (frame_id parameter)
+        base_frame = self.get_parameter('frame_id').get_parameter_value().string_value
+
+        # Board origin in its own frame (0,0,0, identity)
+        board_pose_board = PoseStamped()
+        board_pose_board.header.stamp = now_stamp
+        board_pose_board.header.frame_id = BOARD_FRAME_NAME
+        board_pose_board.pose.position.x = 0.0
+        board_pose_board.pose.position.y = 0.0
+        board_pose_board.pose.position.z = 0.0
+        board_pose_board.pose.orientation.x = 0.0
+        board_pose_board.pose.orientation.y = 0.0
+        board_pose_board.pose.orientation.z = 0.0
+        board_pose_board.pose.orientation.w = 1.0
+
+        try:
+            # Transform board origin into base_link (or whatever frame_id is)
+            board_pose_base = self.tf_buffer.transform(
+                board_pose_board,
+                base_frame,
+                timeout=Duration(seconds=0.2)
+            )
+            board_pose = board_pose_base
+        except Exception as e:
+            self.get_logger().warn(
+                f"Failed to transform board pose from {BOARD_FRAME_NAME} "
+                f"to {base_frame}: {e}"
+            )
+            # Fallback: keep it in board frame (better than nothing)
+            board_pose = board_pose_board
+
+        return board_pose
+
 
 
 def main():
