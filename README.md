@@ -4,7 +4,11 @@ A ROS2-based robotic system for solving the Klotski sliding puzzle using compute
 
 ## 📋 Overview
 
-This project implements an automated Klotski puzzle solver that:
+Klotski is a classic sliding-block puzzle in which ten blocks of varying sizes must be maneuvered within a confined board. While the traditional objective is to guide the largest block to the bottom, in practice every intermediate transition between board states can be just as demanding as the final solution.
+
+This Klotski solver is designed to support players who want to deepen their understanding of the puzzle. It continuously observes a physical Klotski board, tracks player moves, and updates its internal model to mirror the real-world configuration. When prompted, the solver can compute the shortest sequence of moves needed to reach a specified goal state from the current layout. Whether a player requests a single hint or a complete solution, the system can also physically manipulate the board pieces using its robotic end effector, providing both guidance and automated demonstration.
+
+In summmary this project implements an automated Klotski puzzle solver that:
 
 - **Senses**: Uses computer vision to detect the current puzzle state
 - **Plans**: Generates optimal move sequences to reach the goal configuration
