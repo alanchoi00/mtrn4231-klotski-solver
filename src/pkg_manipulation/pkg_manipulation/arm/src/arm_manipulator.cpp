@@ -20,9 +20,9 @@ ArmManipulator::ArmManipulator() : Node("arm_manipulator") {
   board_rotation_yaw_ = 0.0;
   if (use_dynamic_board_pose_) {
     board_pose_sub_ =
-        this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/board_pose", 10,
-            std::bind(&ArmManipulator::board_pose_callback, this,
+        this->create_subscription<klotski_interfaces::msg::BoardState>(
+            "/board_state", 10,
+            std::bind(&ArmManipulator::board_state_callback, this,
                       std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(),
                 "✓ Subscribed to /board_pose for dynamic board updates");
@@ -774,13 +774,33 @@ bool ArmManipulator::planAndExecuteSmoothedMotion(
 //   yaw=%.1f°",
 //               board_center_x_, board_center_y_, yaw * 180.0 / M_PI);
 // }
-void ArmManipulator::board_pose_callback(
-    const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-  board_center_x_ = msg->pose.position.x;
-  board_center_y_ = msg->pose.position.y;
+// void ArmManipulator::board_state_callback(
+//     const klotski_interfaces::msg::BoardState::SharedPtr msg) {
+//   board_center_x_ = msg->pose.position.x;
+//   board_center_y_ = msg->pose.position.y;
 
-  tf2::Quaternion q(msg->pose.orientation.x, msg->pose.orientation.y,
-                    msg->pose.orientation.z, msg->pose.orientation.w);
+//   tf2::Quaternion q(msg->pose.orientation.x, msg->pose.orientation.y,
+//                     msg->pose.orientation.z, msg->pose.orientation.w);
+
+//   tf2::Matrix3x3 m(q);
+//   double roll, pitch, yaw;
+//   m.getRPY(roll, pitch, yaw);
+//   board_rotation_yaw_ = yaw;
+
+//   RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+//                        "Board: pos=(%.3f,%.3f), yaw=%.1f°", board_center_x_,
+//                        board_center_y_, yaw * 180.0 / M_PI);
+// }
+
+void ArmManipulator::board_state_callback(
+    const klotski_interfaces::msg::BoardState::SharedPtr msg) {
+  // ✅ 正确：board_pose是PoseStamped，所以要加.pose
+  board_center_x_ = msg->board_pose.pose.position.x;
+  board_center_y_ = msg->board_pose.pose.position.y;
+
+  tf2::Quaternion q(
+      msg->board_pose.pose.orientation.x, msg->board_pose.pose.orientation.y,
+      msg->board_pose.pose.orientation.z, msg->board_pose.pose.orientation.w);
 
   tf2::Matrix3x3 m(q);
   double roll, pitch, yaw;

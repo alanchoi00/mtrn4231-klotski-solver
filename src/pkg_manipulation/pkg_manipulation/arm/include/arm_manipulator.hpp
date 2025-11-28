@@ -10,6 +10,7 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "klotski_interfaces/action/move_piece.hpp"
+#include "klotski_interfaces/msg/board_state.hpp"
 #include "klotski_interfaces/msg/cell.hpp"
 #include "klotski_interfaces/msg/piece.hpp"
 #include "moveit/move_group_interface/move_group_interface.h"
@@ -234,12 +235,14 @@ class ArmManipulator : public rclcpp::Node {
 
   /*tf_node*/
   double board_rotation_yaw_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr
+  rclcpp::Subscription<klotski_interfaces::msg::BoardState>::SharedPtr
       board_pose_sub_;
   bool use_dynamic_board_pose_;
 
-  void board_pose_callback(
-      const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  //   void board_state_callback(
+  //       const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  void board_state_callback(
+      const klotski_interfaces::msg::BoardState::SharedPtr msg);
 };
 
 }  // namespace pkg_manipulation

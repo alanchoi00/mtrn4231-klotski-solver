@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'mock_sense = pkg_sense.mock_sense_node:main',
+            'sense = pkg_sense.mock_sense_node:main', 
         ],
     },
 )

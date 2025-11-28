@@ -144,13 +144,13 @@ class BoardTFPublisher(Node):
     def estimate_board_pose(self, markers_camera, center_camera):
         """从marker估计棋盘位姿（使用Kabsch算法）"""
         
-        # 棋盘局部坐标系下的marker理论位置
         markers_board = np.array([
-            [-self.board_width/2,  self.board_length/2, 0],  # 左上
-            [ self.board_width/2,  self.board_length/2, 0],  # 右上
-            [ self.board_width/2, -self.board_length/2, 0],  # 右下
-            [-self.board_width/2, -self.board_length/2, 0]   # 左下
+            [-self.board_width/2,  self.board_length/2, 0],  # 0: top-left
+            [ self.board_width/2,  self.board_length/2, 0],  # 1: top-right
+            [-self.board_width/2, -self.board_length/2, 0],  # 2: bottom-left  ← 修正
+            [ self.board_width/2, -self.board_length/2, 0]   # 3: bottom-right ← 修正
         ])
+
         
         # 计算质心
         centroid_camera = markers_camera.mean(axis=0)
@@ -170,18 +170,28 @@ class BoardTFPublisher(Node):
             Vt[-1, :] *= -1
             rotation_matrix = Vt.T @ U.T
         
-        # 使用检测到的中心点作为位置
-        translation = center_camera
+        # # 使用检测到的中心点作为位置
+        # translation = center_camera
+        translation = centroid_camera - rotation_matrix @ centroid_board
+        # # 转换为四元数
+        # rotation = R.from_matrix(rotation_matrix)
+        # quaternion = rotation.as_quat()  # [x, y, z, w]
         
-        # 转换为四元数
+        # return {
+        #     'position': translation,
+        #     'quaternion': quaternion
+        # }
+        self.get_logger().info(
+            f'Board pose in camera:\n'
+            f'  translation: {translation}\n'
+            f'  centroid_camera: {centroid_camera}\n'
+            f'  center_camera: {center_camera}'
+        )
         rotation = R.from_matrix(rotation_matrix)
-        quaternion = rotation.as_quat()  # [x, y, z, w]
-        
-        return {
-            'position': translation,
-            'quaternion': quaternion
-        }
+        quaternion = rotation.as_quat()
+        return {'position': translation, 'quaternion': quaternion}
     
+
     def transform_to_base_link(self, board_pose_camera):
         """将相机坐标系下的位姿转换到base_link"""
         try:
@@ -218,6 +228,16 @@ class BoardTFPublisher(Node):
             
             # 执行变换
             pose_base = self.do_transform_pose(pose_camera, transform)
+
+            # 添加调试
+            self.get_logger().info(
+                f'Before transform (camera): ({pose_camera.pose.position.x:.3f}, '
+                f'{pose_camera.pose.position.y:.3f}, {pose_camera.pose.position.z:.3f})'
+            )
+            self.get_logger().info(
+                f'After transform (base): ({pose_base.pose.position.x:.3f}, '
+                f'{pose_base.pose.position.y:.3f}, {pose_base.pose.position.z:.3f})'
+            )
             
             return pose_base
             
