@@ -26,9 +26,9 @@ MIN_CELL_COLOUR_AREA = 400      # area in pixels to count a cell as filled
 
 # TF / ARUCO CONFIG (MATCH OTHER GROUPS)
 CAMERA_FRAME = "camera_color_optical_frame"   # RealSense color optical frame
-CAMERA_LINK_FRAME = "camera_link"            # <<< NEW: for marker_pose target frame
+CAMERA_LINK_FRAME = "camera_link"            # for marker_pose target frame
 BOARD_MARKER_ID = 2                          # bottom-left marker ID
-BOARD_MARKER_LENGTH_M = 0.07                 # marker side length (m) – adjust if needed
+BOARD_MARKER_LENGTH_M = 0.065                # <<< UPDATED marker side length (m)
 BOARD_OFFSET_X_M = 0.040                     # 40 mm to the right (marker frame X)
 BOARD_OFFSET_Y_M = 0.040                     # 40 mm up (marker frame Y)
 BOARD_FRAME_NAME = "klotski_board"           # board frame (bottom-left of board)
@@ -37,7 +37,7 @@ BOARD_FRAME_NAME = "klotski_board"           # board frame (bottom-left of board
 HSV_RANGES = {
     "red1":   ((0,   100,  80), (10,  255, 255)),
     "red2":   ((170, 100,  80), (180, 255, 255)),
-    "yellow": ((21, 95, 35), (35,  255, 255)),
+    "yellow": ((24, 10, 69), (59,  255, 255)),
     "green":  ((44,   32,  76), (94,  255, 255)),
     "blue":   ((95,   198,  0), (130, 255, 156)),
     "grey":   ((0,     0,  50), (180,  70, 230)),   # low-saturation greys
@@ -88,32 +88,67 @@ def rotation_matrix_to_quaternion(R):
 
 
 # ------------------------------
-# ARUCO DETECTION
+# ARUCO DETECTION (MULTI-PASS)
 def detect_aruco_info(image_bgr):
-    """Detect ArUco 0,1,2,3 (DICT_ARUCO_ORIGINAL) and return centers + corners."""
+    """
+    Detect ArUco 0,1,2,3 (DICT_ARUCO_ORIGINAL) and return centers + corners.
+    Uses multiple parameter sets to make detection more robust.
+    """
     aruco = cv2.aruco
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     dictionary = aruco.getPredefinedDictionary(ARUCO_DICT)
-    params = aruco.DetectorParameters()
-    params.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
 
-    try:
-        detector = aruco.ArucoDetector(dictionary, params)
-        corners_list, ids, _ = detector.detectMarkers(gray)
-    except Exception:
-        corners_list, ids, _ = aruco.detectMarkers(gray, dictionary, parameters=params)
+    # Different detector configs to try
+    trials = [
+        {},  # default
+        {"adaptiveThreshConstant": 5},
+        {"adaptiveThreshConstant": 10},
+        {"minMarkerPerimeterRate": 0.02},
+        {"minMarkerPerimeterRate": 0.02, "adaptiveThreshConstant": 10},
+    ]
+
+    best_ids = None
+    best_corners_list = None
+    best_score = -1
+
+    for cfg in trials:
+        params = aruco.DetectorParameters()
+        # apply overrides
+        for k, v in cfg.items():
+            setattr(params, k, v)
+
+        try:
+            detector = aruco.ArucoDetector(dictionary, params)
+            corners_list, ids, _ = detector.detectMarkers(gray)
+        except Exception:
+            corners_list, ids, _ = aruco.detectMarkers(gray, dictionary, parameters=params)
+
+        if ids is None:
+            continue
+
+        ids_flat = ids.flatten()
+        # score = number of IDs we care about
+        score = sum(1 for i in ids_flat if int(i) in (0, 1, 2, 3))
+        if score > best_score:
+            best_score = score
+            best_ids = ids_flat
+            best_corners_list = corners_list
+
+        # early exit if we already have all four
+        if score == 4:
+            break
 
     info = {}
-    if ids is not None:
-        ids = ids.flatten()
-        for corners, i in zip(corners_list, ids):
+    if best_ids is not None:
+        for corners, i in zip(best_corners_list, best_ids):
             if int(i) not in (0, 1, 2, 3):
-                continue  # ignore stray tags
+                continue
             pts = corners.reshape(4, 2).astype(np.float32)
             center = pts.mean(axis=0)
             info[int(i)] = {"center": center, "corners": pts}
 
     return info
+
 
 # ------------------------------
 # HOMOGRAPHY
@@ -159,9 +194,11 @@ def compute_homography_auto(info):
         raise RuntimeError("Homography failed")
     return Hmat, (out_w, out_h)
 
+
 def warp_board(image_bgr, Hmat, size):
     out_w, out_h = size
     return cv2.warpPerspective(image_bgr, Hmat, (out_w, out_h))
+
 
 # ------------------------------
 # COLOUR DETECTION
@@ -183,6 +220,7 @@ def build_colour_masks(warped_bgr):
         m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, kernel)
         masks[k] = m
     return masks
+
 
 # ------------------------------
 # GRID CLASSIFICATION
@@ -225,6 +263,7 @@ def classify_cells(warped_bgr):
             grid_bottom[r_bot][c] = grid_top[r_top][c]
     return grid_bottom, overlay, masks
 
+
 # ------------------------------
 # PIECES (ENFORCED SHAPES) → BOARD
 def _add_cell(pm: Piece, r: int, c: int):
@@ -232,6 +271,7 @@ def _add_cell(pm: Piece, r: int, c: int):
     cell.row = int(r)
     cell.col = int(c)
     pm.cells.append(cell)
+
 
 def grid_to_board(grid, rectified_size_px=None) -> Board:
     """
@@ -403,7 +443,74 @@ class Sense(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
+        # --- Pose smoothing / outlier rejection per marker ---
+        self.marker_pos_hist = {mid: [] for mid in (0, 1, 2, 3)}
+        self.marker_rot_hist = {mid: [] for mid in (0, 1, 2, 3)}
+        self.marker_bootstrap_count = {mid: 0 for mid in (0, 1, 2, 3)}
+        self.marker_locked = {mid: False for mid in (0, 1, 2, 3)}
+
+        self.bootstrap_samples = 15          # frames before "lock" per marker
+        self.bootstrap_spread_thresh = 0.02  # m; max spread to consider stable
+        self.outlier_thresh = 0.03           # m; reject if further than this from avg
+
+        # --- Cached TF so frames stay in RViz even between service calls ---
+        # key: child_frame_id, value: TransformStamped
+        self.cached_tf = {}
+        self.tf_timer = self.create_timer(0.1, self.tf_timer_callback)
+
         self.get_logger().info("sense ready: /sense/capture_board")
+
+    # ------------------ helper: quaternion average ------------------
+    def average_quaternions(self, quats):
+        """
+        Average a list of quaternions using Markley method.
+        quats: list of [x,y,z,w]
+        """
+        if not quats:
+            return [0.0, 0.0, 0.0, 1.0]
+        M = np.zeros((4, 4))
+        for q in quats:
+            q = np.array(q, dtype=float).reshape(4, 1)
+            M += q @ q.T
+        eigenvalues, eigenvectors = np.linalg.eigh(M)
+        avg_q = eigenvectors[:, np.argmax(eigenvalues)]
+        avg_q = avg_q / np.linalg.norm(avg_q)
+        return avg_q.tolist()  # [x,y,z,w]
+
+    # ------------------ helper: depth → 3D point ------------------
+    def depth_pixel_to_point(self, u, v):
+        """
+        Use aligned depth + intrinsics to get 3D point in camera frame.
+        u = x (col), v = y (row)
+        Returns [X, Y, Z] in meters or None.
+        """
+        if self.depth_image is None or self.intrinsics is None:
+            return None
+        h, w = self.depth_image.shape[:2]
+        if u < 0 or v < 0 or u >= w or v >= h:
+            return None
+
+        depth_raw = float(self.depth_image[int(v), int(u)])
+        if depth_raw <= 0:
+            return None
+        depth_m = depth_raw * 0.001  # RealSense depth is in mm
+
+        X, Y, Z = rs.rs2_deproject_pixel_to_point(
+            self.intrinsics, [float(u), float(v)], depth_m
+        )
+        return [X, Y, Z]
+
+    # ------------------ TF timer: keep frames alive in RViz ------------------
+    def tf_timer_callback(self):
+        """
+        Re-broadcast last known transforms so TF frames don't disappear in RViz.
+        """
+        if not self.cached_tf:
+            return
+        now = self.get_clock().now().to_msg()
+        for child, tf_msg in self.cached_tf.items():
+            tf_msg.header.stamp = now
+            self.tf_broadcaster.sendTransform(tf_msg)
 
     # --- subs
     def arm_image_depth_info_callback(self, cameraInfo):
@@ -461,7 +568,7 @@ class Sense(Node):
         now_stamp = self.get_clock().now().to_msg()
 
         # --- compute 3D poses for all 4 markers in CAMERA_FRAME ---
-        marker_data_cam = {}   # id -> dict(pose=PoseStamped, R=3x3, tvec=3x1, quat=[x,y,z,w])
+        marker_data_cam = {}   # id -> dict(pose=PoseStamped, R, tvec, quat)
 
         if self.intrinsics is None:
             self.get_logger().warn("Intrinsics not ready; cannot compute marker 3D poses.")
@@ -497,37 +604,116 @@ class Sense(Node):
                     R, _ = cv2.Rodrigues(rvec)
                     qx, qy, qz, qw = rotation_matrix_to_quaternion(R)
 
+                    # ------------- smoothing / outlier rejection -------------
+                    pos_vec = np.array([tvec[0, 0], tvec[1, 0], tvec[2, 0]])
+                    quat = [qx, qy, qz, qw]
+
+                    # BOOTSTRAP phase: accumulate until we can "lock" on a stable pose
+                    if not self.marker_locked[mid]:
+                        self.marker_pos_hist[mid].append(pos_vec)
+                        self.marker_rot_hist[mid].append(quat)
+                        self.marker_bootstrap_count[mid] += 1
+
+                        if self.marker_bootstrap_count[mid] >= self.bootstrap_samples:
+                            hist_arr = np.stack(self.marker_pos_hist[mid])
+                            mean_pos = np.mean(hist_arr, axis=0)
+                            dists = np.linalg.norm(hist_arr - mean_pos, axis=1)
+                            spread = float(np.max(dists))
+
+                            if spread < self.bootstrap_spread_thresh:
+                                self.marker_locked[mid] = True
+                                self.get_logger().info(
+                                    f"[marker {mid}] bootstrap lock: spread={spread:.3f} m, "
+                                    f"mean={mean_pos}"
+                                )
+                            else:
+                                self.get_logger().warn(
+                                    f"[marker {mid}] bootstrap failed (spread={spread:.3f} m), "
+                                    f"resetting samples."
+                                )
+                                self.marker_pos_hist[mid].clear()
+                                self.marker_rot_hist[mid].clear()
+                                self.marker_bootstrap_count[mid] = 0
+
+                        # during bootstrap, still use raw pose for TF & state so you can see it
+                        use_pos = pos_vec
+                        use_quat = quat
+                    else:
+                        # LOCKED phase: reject outliers
+                        hist = self.marker_pos_hist[mid]
+                        if len(hist) > 0:
+                            prev_avg = np.mean(hist, axis=0)
+                            dist = float(np.linalg.norm(pos_vec - prev_avg))
+                            if dist > self.outlier_thresh:
+                                self.get_logger().warn(
+                                    f"[marker {mid}] rejecting pose as outlier: "
+                                    f"dist={dist:.3f} m from avg"
+                                )
+                                # don't update history; use previous avg pose
+                                use_pos = prev_avg
+                                use_quat = self.average_quaternions(self.marker_rot_hist[mid])
+                            else:
+                                hist.append(pos_vec)
+                                self.marker_rot_hist[mid].append(quat)
+                                use_pos = np.mean(hist, axis=0)
+                                use_quat = self.average_quaternions(self.marker_rot_hist[mid])
+                        else:
+                            # shouldn't really happen, but fallback to raw
+                            use_pos = pos_vec
+                            use_quat = quat
+
+                    # ---------------- Depth vs PnP debug for marker 3 ----------------
+                    if mid == 3:
+                        center = info[mid]["center"]
+                        u, v = int(center[0]), int(center[1])
+                        depth_pt = self.depth_pixel_to_point(u, v)
+                        if depth_pt is not None:
+                            Xd, Yd, Zd = depth_pt
+                            self.get_logger().info(
+                                f"[marker 3] PnP tvec (smoothed): "
+                                f"x={use_pos[0]:.3f}, y={use_pos[1]:.3f}, z={use_pos[2]:.3f}  |  "
+                                f"Depth deproj: X={Xd:.3f}, Y={Yd:.3f}, Z={Zd:.3f}"
+                            )
+                        else:
+                            self.get_logger().info(
+                                "[marker 3] Depth point unavailable (no depth or invalid pixel)."
+                            )
+
+                    # --- build PoseStamped in CAMERA_FRAME using smoothed pose ---
                     pose_cam = PoseStamped()
                     pose_cam.header.stamp = now_stamp
                     pose_cam.header.frame_id = CAMERA_FRAME
-                    pose_cam.pose.position.x = float(tvec[0])
-                    pose_cam.pose.position.y = float(tvec[1])
-                    pose_cam.pose.position.z = float(tvec[2])
-                    pose_cam.pose.orientation.x = qx
-                    pose_cam.pose.orientation.y = qy
-                    pose_cam.pose.orientation.z = qz
-                    pose_cam.pose.orientation.w = qw
+                    pose_cam.pose.position.x = float(use_pos[0])
+                    pose_cam.pose.position.y = float(use_pos[1])
+                    pose_cam.pose.position.z = float(use_pos[2])
+                    pose_cam.pose.orientation.x = use_quat[0]
+                    pose_cam.pose.orientation.y = use_quat[1]
+                    pose_cam.pose.orientation.z = use_quat[2]
+                    pose_cam.pose.orientation.w = use_quat[3]
 
                     marker_data_cam[mid] = {
                         "pose": pose_cam,
                         "R": R,
-                        "tvec": tvec,
-                        "quat": [qx, qy, qz, qw],
+                        "tvec": use_pos.reshape(3, 1),
+                        "quat": use_quat,
                     }
 
-                    # <<< NEW: broadcast TF for ALL markers 0–3 >>>
+                    # --- broadcast TF for ALL markers 0–3 (smoothed) ---
                     t_marker = TransformStamped()
                     t_marker.header.stamp = now_stamp
                     t_marker.header.frame_id = CAMERA_FRAME
                     t_marker.child_frame_id = f"aruco_{mid}"
-                    t_marker.transform.translation.x = float(tvec[0])
-                    t_marker.transform.translation.y = float(tvec[1])
-                    t_marker.transform.translation.z = float(tvec[2])
-                    t_marker.transform.rotation.x = qx
-                    t_marker.transform.rotation.y = qy
-                    t_marker.transform.rotation.z = qz
-                    t_marker.transform.rotation.w = qw
+                    t_marker.transform.translation.x = float(use_pos[0])
+                    t_marker.transform.translation.y = float(use_pos[1])
+                    t_marker.transform.translation.z = float(use_pos[2])
+                    t_marker.transform.rotation.x = use_quat[0]
+                    t_marker.transform.rotation.y = use_quat[1]
+                    t_marker.transform.rotation.z = use_quat[2]
+                    t_marker.transform.rotation.w = use_quat[3]
+
                     self.tf_broadcaster.sendTransform(t_marker)
+                    # cache for timer re-broadcast
+                    self.cached_tf[f"aruco_{mid}"] = t_marker
 
                 self.get_logger().info("Published TF for aruco markers 0–3 in camera_color_optical_frame")
             except Exception as e:
@@ -536,9 +722,6 @@ class Sense(Node):
         # --- TF for board frame, using BOARD_MARKER_ID (2) ---
         if BOARD_MARKER_ID in marker_data_cam:
             try:
-                md = marker_data_cam[BOARD_MARKER_ID]
-                tvec = md["tvec"]
-
                 # aruco_2 -> klotski_board (bottom-left of board)
                 t_board = TransformStamped()
                 t_board.header.stamp = now_stamp
@@ -556,6 +739,7 @@ class Sense(Node):
                 t_board.transform.rotation.w = 1.0
 
                 self.tf_broadcaster.sendTransform(t_board)
+                self.cached_tf[BOARD_FRAME_NAME] = t_board
 
                 self.get_logger().info(
                     f"Published TF: aruco_{BOARD_MARKER_ID} -> {BOARD_FRAME_NAME}"
@@ -596,7 +780,7 @@ class Sense(Node):
 
         # --- marker_pose[] as markers 0–3 in CAMERA_LINK_FRAME (camera_link) ---
         marker_poses_out = []
-        target_frame = CAMERA_LINK_FRAME   # <<< UPDATED: fixed to camera_link >>>
+        target_frame = CAMERA_LINK_FRAME
 
         for mid in (0, 1, 2, 3):
             if mid not in marker_data_cam:
@@ -634,6 +818,7 @@ def main():
     sense = Sense()
     rclpy.spin(sense)
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
