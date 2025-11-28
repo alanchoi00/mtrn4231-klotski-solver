@@ -17,6 +17,7 @@ from geometry_msgs.msg import TransformStamped, PoseStamped
 
 from klotski_interfaces.msg import Board, BoardSpec, BoardState, Cell, Piece
 from klotski_interfaces.srv import CaptureBoard
+from tf2_geometry_msgs import do_transform_pose
 
 # ------------------------------
 # CONFIG
@@ -33,7 +34,7 @@ BOARD_OFFSET_X_M = 0.040                     # 40 mm to the right (marker frame 
 BOARD_OFFSET_Y_M = 0.040                     # 40 mm up (marker frame Y)
 BOARD_FRAME_NAME = "klotski_board"           # board frame (bottom-left of board)
 
-# HSV thresholds (tune to your lighting)
+# HSV thresholds 
 HSV_RANGES = {
     "red1":   ((0,   100,  80), (10,  255, 255)),
     "red2":   ((170, 100,  80), (180, 255, 255)),
@@ -662,22 +663,83 @@ class Sense(Node):
                             use_pos = pos_vec
                             use_quat = quat
 
-                    # ---------------- Depth vs PnP debug for marker 3 ----------------
-                    if mid == 3:
+                    # ---------------- Depth vs PnP debug for marker 2 in base frame ----------------
+                    if mid == 2:
+                        base_frame = self.get_parameter('frame_id').get_parameter_value().string_value
+
+                        # --- PnP (smoothed) in base_frame ---
+                        pnp_cam = PoseStamped()
+                        pnp_cam.header.stamp = now_stamp
+                        pnp_cam.header.frame_id = CAMERA_FRAME
+                        pnp_cam.pose.position.x = float(use_pos[0])
+                        pnp_cam.pose.position.y = float(use_pos[1])
+                        pnp_cam.pose.position.z = float(use_pos[2])
+                        # orientation not important for this debug; just make it valid
+                        pnp_cam.pose.orientation.x = 0.0
+                        pnp_cam.pose.orientation.y = 0.0
+                        pnp_cam.pose.orientation.z = 0.0
+                        pnp_cam.pose.orientation.w = 1.0
+
+                        pb = None
+                        try:
+                            pnp_base = self.tf_buffer.transform(
+                                pnp_cam,
+                                base_frame,
+                                timeout=Duration(seconds=0.2)
+                            )
+                            pb = pnp_base.pose.position
+                        except Exception as e:
+                            self.get_logger().warn(
+                                f"[marker 2] Failed to transform PnP pose to {base_frame}: {e}"
+                            )
+
+                        # --- Depth point for marker 2 center in base_frame ---
+                        db = None
                         center = info[mid]["center"]
                         u, v = int(center[0]), int(center[1])
                         depth_pt = self.depth_pixel_to_point(u, v)
                         if depth_pt is not None:
                             Xd, Yd, Zd = depth_pt
-                            self.get_logger().info(
-                                f"[marker 3] PnP tvec (smoothed): "
-                                f"x={use_pos[0]:.3f}, y={use_pos[1]:.3f}, z={use_pos[2]:.3f}  |  "
-                                f"Depth deproj: X={Xd:.3f}, Y={Yd:.3f}, Z={Zd:.3f}"
-                            )
+
+                            depth_cam = PoseStamped()
+                            depth_cam.header.stamp = now_stamp
+                            depth_cam.header.frame_id = CAMERA_FRAME
+                            depth_cam.pose.position.x = Xd
+                            depth_cam.pose.position.y = Yd
+                            depth_cam.pose.position.z = Zd
+                            depth_cam.pose.orientation.x = 0.0
+                            depth_cam.pose.orientation.y = 0.0
+                            depth_cam.pose.orientation.z = 0.0
+                            depth_cam.pose.orientation.w = 1.0
+
+                            try:
+                                depth_base = self.tf_buffer.transform(
+                                    depth_cam,
+                                    base_frame,
+                                    timeout=Duration(seconds=0.2)
+                                )
+                                db = depth_base.pose.position
+                            except Exception as e:
+                                self.get_logger().warn(
+                                    f"[marker 2] Failed to transform depth point to {base_frame}: {e}"
+                                )
                         else:
                             self.get_logger().info(
-                                "[marker 3] Depth point unavailable (no depth or invalid pixel)."
+                                "[marker 2] Depth point unavailable (no depth or invalid pixel)."
                             )
+
+                        if pb is not None and db is not None:
+                            self.get_logger().info(
+                                f"[marker 2] {base_frame} PnP (smoothed): "
+                                f"x={pb.x:.3f}, y={pb.y:.3f}, z={pb.z:.3f}  |  "
+                                f"Depth: x={db.x:.3f}, y={db.y:.3f}, z={db.z:.3f}"
+                            )
+                        elif pb is not None:
+                            self.get_logger().info(
+                                f"[marker 2] {base_frame} PnP (smoothed): "
+                                f"x={pb.x:.3f}, y={pb.y:.3f}, z={pb.z:.3f}  |  Depth: unavailable"
+                            )
+
 
                     # --- build PoseStamped in CAMERA_FRAME using smoothed pose ---
                     pose_cam = PoseStamped()
