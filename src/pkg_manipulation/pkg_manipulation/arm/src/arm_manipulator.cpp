@@ -526,45 +526,89 @@ geometry_msgs::msg::PoseStamped ArmManipulator::calculatePieceCenterPose(
 //   return pose;
 // }
 
+// geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double
+// col,
+//                                                                    double
+//                                                                    row) {
+//   geometry_msgs::msg::PoseStamped pose;
+//   pose.header.frame_id = "base_link";
+//   pose.header.stamp = this->now();
+
+//   // 计算局部坐标
+//   double local_x = (col - 1.5) * cell_size_;
+//   double local_y = (2.0 - row) * cell_size_;
+
+//   // 应用旋转
+//   double rotated_x, rotated_y;
+//   if (use_dynamic_board_pose_) {
+//     double cos_theta = std::cos(board_rotation_yaw_);
+//     double sin_theta = std::sin(board_rotation_yaw_);
+//     rotated_x = local_x * cos_theta - local_y * sin_theta;
+//     rotated_y = local_x * sin_theta + local_y * cos_theta;
+//   } else {
+//     rotated_x = local_x;
+//     rotated_y = local_y;
+//   }
+
+//   // 转换到base_link
+//   pose.pose.position.x = board_center_x_ + rotated_x;
+//   pose.pose.position.y = board_center_y_ + rotated_y;
+//   pose.pose.position.z = 0.0;
+
+//   // 设置姿态
+//   tf2::Quaternion q;
+//   if (use_dynamic_board_pose_) {
+//     q.setRPY(M_PI, 0, board_rotation_yaw_);
+//   } else {
+//     q.setRPY(M_PI, 0, 0);
+//   }
+
+//   pose.pose.orientation.x = q.x();
+//   pose.pose.orientation.y = q.y();
+//   pose.pose.orientation.z = q.z();
+//   pose.pose.orientation.w = q.w();
+
+//   return pose;
+// }
+
 geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double col,
                                                                    double row) {
   geometry_msgs::msg::PoseStamped pose;
-  pose.header.frame_id = "base_link";
   pose.header.stamp = this->now();
+  pose.header.frame_id = "base_link";
 
-  // 计算局部坐标
-  double local_x = (col - 1.5) * cell_size_;
-  double local_y = (2.0 - row) * cell_size_;
+  const double cols = 4.0;
+  const double rows = 5.0;
 
-  // 应用旋转
-  double rotated_x, rotated_y;
+  const double local_x = (col - (cols - 1.0) / 2.0) * cell_size_;
+  const double local_y = (row - (rows - 1.0) / 2.0) * cell_size_;
+
+  double rotated_x = local_x;
+  double rotated_y = local_y;
   if (use_dynamic_board_pose_) {
-    double cos_theta = std::cos(board_rotation_yaw_);
-    double sin_theta = std::sin(board_rotation_yaw_);
+    const double cos_theta = std::cos(board_rotation_yaw_);
+    const double sin_theta = std::sin(board_rotation_yaw_);
     rotated_x = local_x * cos_theta - local_y * sin_theta;
     rotated_y = local_x * sin_theta + local_y * cos_theta;
-  } else {
-    rotated_x = local_x;
-    rotated_y = local_y;
   }
 
-  // 转换到base_link
   pose.pose.position.x = board_center_x_ + rotated_x;
   pose.pose.position.y = board_center_y_ + rotated_y;
-  pose.pose.position.z = 0.0;
 
-  // 设置姿态
+  pose.pose.position.z = board_height_;
+
   tf2::Quaternion q;
-  if (use_dynamic_board_pose_) {
-    q.setRPY(M_PI, 0, board_rotation_yaw_);
-  } else {
-    q.setRPY(M_PI, 0, 0);
-  }
+  q.setRPY(0.0, M_PI, board_rotation_yaw_);
+  pose.pose.orientation = tf2::toMsg(q);
 
-  pose.pose.orientation.x = q.x();
-  pose.pose.orientation.y = q.y();
-  pose.pose.orientation.z = q.z();
-  pose.pose.orientation.w = q.w();
+  // debug
+  RCLCPP_INFO(this->get_logger(),
+              "cell->world: (col=%.2f, row=%.2f) -> (x=%.3f, y=%.3f) | "
+              "board_center=(%.3f, %.3f), local=(%.3f, %.3f), rotated=(%.3f, "
+              "%.3f), yaw=%.1f deg",
+              col, row, pose.pose.position.x, pose.pose.position.y,
+              board_center_x_, board_center_y_, local_x, local_y, rotated_x,
+              rotated_y, board_rotation_yaw_ * 180.0 / M_PI);
 
   return pose;
 }
@@ -794,7 +838,6 @@ bool ArmManipulator::planAndExecuteSmoothedMotion(
 
 void ArmManipulator::board_state_callback(
     const klotski_interfaces::msg::BoardState::SharedPtr msg) {
-  // ✅ 正确：board_pose是PoseStamped，所以要加.pose
   board_center_x_ = msg->board_pose.pose.position.x;
   board_center_y_ = msg->board_pose.pose.position.y;
 
