@@ -74,6 +74,8 @@ def generate_launch_description():
                         'ur_type': 'ur5e',
                         'use_fake_hardware': LaunchConfiguration('sim'),
                         'launch_rviz': 'true',
+                        'description_package' : 'ur_with_gripper_description', 
+                        'description_file' : 'ur_with_gripper.xacro',
                     }.items(),
                 ),
             ]
