@@ -65,12 +65,6 @@ def generate_launch_description():
         FindPackageShare('ur_moveit_config'), 'launch', 'ur_moveit.launch.py'
     ])
 
-    tf_launch = PathJoinSubstitution([
-        FindPackageShare('pkg_tf'),  
-        'launch',
-        'pkg_tf.launch.py'
-    ])
-
 
     return LaunchDescription([
         # Launch arguments
@@ -164,10 +158,6 @@ def generate_launch_description():
 
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(sense_launch),
-                ),
-
-                IncludeLaunchDescription(  
-                    PythonLaunchDescriptionSource(tf_launch),
                 ),
             ],
         ),
