@@ -57,35 +57,35 @@ class DeclareParam(Generic[T]):
             val = raw.integer_value
             if val is None:
                 raise RuntimeError("Parameter integer value is None")
-        if python_type is float:
+        elif python_type is float:
             val = raw.double_value
             if val is None:
                 raise RuntimeError("Parameter double value is None")
-        if python_type is bool:
+        elif python_type is bool:
             val = raw.bool_value
             if val is None:
                 raise RuntimeError("Parameter bool value is None")
-        if python_type is str:
+        elif python_type is str:
             val = raw.string_value
             if val is None:
                 raise RuntimeError("Parameter string value is None")
-        if python_type is list[int]:
+        elif python_type is list[int]:
             val = raw.integer_array_value
             if val is None:
                 raise RuntimeError("Parameter integer array value is None")
-        if python_type is list[float]:
+        elif python_type is list[float]:
             val = raw.double_array_value
             if val is None:
                 raise RuntimeError("Parameter double array value is None")
-        if python_type is list[bool]:
+        elif python_type is list[bool]:
             val = raw.bool_array_value
             if val is None:
                 raise RuntimeError("Parameter bool array value is None")
-        if python_type is list[str]:
+        elif python_type is list[str]:
             val = raw.string_array_value
             if val is None:
                 raise RuntimeError("Parameter string array value is None")
-        if python_type is list[bytes]:
+        elif python_type is list[bytes]:
             val = raw.byte_array_value
             if val is None:
                 raise RuntimeError("Parameter byte array value is None")
