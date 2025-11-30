@@ -180,7 +180,10 @@ def main(args=None):
     node = Sense()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
+        node.get_logger().info(
+            f"KeyboardInterrupt received, shutting down node...: {e}"
+        )
         pass
     finally:
         node.destroy_node()
