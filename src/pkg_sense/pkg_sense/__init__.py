@@ -1,7 +1,8 @@
 from .constants import ColourName
-from .core import *
-from .exceptions import *
+from .exceptions import LeftoverCellsError, InvalidBoardConfiguration
 
 __all__ = [
     "ColourName",
+    "LeftoverCellsError",
+    "InvalidBoardConfiguration",
 ]
