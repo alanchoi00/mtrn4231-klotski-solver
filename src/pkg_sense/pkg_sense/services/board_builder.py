@@ -29,6 +29,7 @@ class CellGrid:
     Assumes (row, col) with row=0 at bottom and col=0 at left, matching
     the logical board coordinate system.
     """
+
     dims: GridDimensions
     data: List[List[ColourName]]  # shape [rows][cols]
 
@@ -41,6 +42,7 @@ def append_cell_to_piece(piece: Piece, idx: CellIndex) -> None:
     cell.row = int(idx.row)
     cell.col = int(idx.col)
     piece.cells = [*piece.cells, cell]
+
 
 def extract_red_blocks(
     grid: CellGrid,
@@ -103,11 +105,7 @@ def extract_green_blocks(
                 continue
 
             run_start = c
-            while (
-                c < cols
-                and not visited[r][c]
-                and grid.data[r][c] == "green"
-            ):
+            while c < cols and not visited[r][c] and grid.data[r][c] == "green":
                 c += 1
 
             run_len = c - run_start
@@ -153,11 +151,7 @@ def extract_blue_blocks(
                 continue
 
             run_start = r
-            while (
-                r < rows
-                and not visited[r][c]
-                and grid.data[r][c] == "blue"
-            ):
+            while r < rows and not visited[r][c] and grid.data[r][c] == "blue":
                 r += 1
 
             run_len = r - run_start
@@ -208,6 +202,7 @@ def extract_yellow_blocks(
 
     return pieces
 
+
 def find_leftover_cells(
     grid: CellGrid,
     visited: List[List[bool]],
@@ -221,10 +216,11 @@ def find_leftover_cells(
     for r in range(rows):
         for c in range(cols):
             colour = grid.data[r][c]
-            if not visited[r][c] and colour is not "empty":
+            if not visited[r][c] and colour != "empty":
                 leftovers.append((r, c, colour))
 
     return leftovers
+
 
 def grid_to_board(
     grid_raw: List[List[ColourName]],
@@ -267,10 +263,8 @@ def grid_to_board(
     grid = CellGrid(dims=dims, data=grid_raw)
 
     visited: List[List[bool]] = [
-        [False for _ in range(dims.cols)]
-        for _ in range(dims.rows)
+        [False for _ in range(dims.cols)] for _ in range(dims.rows)
     ]
-
 
     board_msg = Board()
     board_msg.pieces = [
@@ -282,7 +276,9 @@ def grid_to_board(
 
     leftovers = find_leftover_cells(grid, visited)
     if leftovers:
-        raise LeftoverCellsError(f"Leftover coloured cells not forming valid pieces: {leftovers}")
+        raise LeftoverCellsError(
+            f"Leftover coloured cells not forming valid pieces: {leftovers}"
+        )
 
     spec = BoardSpec()
     spec.cols = board_width_cells
