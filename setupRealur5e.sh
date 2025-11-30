@@ -4,7 +4,14 @@ sleep 10
 
 gnome-terminal -t "MoveitServer" -e 'ros2 launch ur_moveit_config ur_moveit.launch.py robot_ip:=192.168.0.100 ur_type:=ur5e launch_rviz:=true'
 
-
+gnome-terminal --title="MoveitServer" -- bash -c \
+'ros2 launch ur_moveit_config ur_moveit.launch.py \
+    robot_ip:=192.168.0.100 \ 
+    ur_type:=ur5e \
+    launch_rviz:=true \
+    description_package:=ur_with_gripper_description \
+    description_file:=ur_with_gripper.xacro; \
+    exec bash'
 
 
 
