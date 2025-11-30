@@ -4,7 +4,7 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 
 from klotski_interfaces.msg import BoardState
 
-from ..managers import CameraManager, TransformationManager
+from ..managers import BoardStateManager, CameraManager, TransformationManager
 from ..services import (HSVConfig, annotate_cell_colors, build_masks,
                         detect_aruco_markers, get_missing_target_ids,
                         grid_to_board, render_annotated_grid_overlay_image,
@@ -16,6 +16,7 @@ class CaptureBoardHandler:
         self,
         camera_manager: CameraManager,
         tf_manager: TransformationManager,
+        board_state_manager: BoardStateManager,
         clock: Clock,
         logger: RcutilsLogger,
         hsv_config: HSVConfig,
@@ -25,6 +26,7 @@ class CaptureBoardHandler:
     ):
         self.camera_manager = camera_manager
         self.tf_manager = tf_manager
+        self.board_state_manager = board_state_manager
         self.hsv_config = hsv_config
         self.clock = clock
         self.logger = logger
@@ -118,5 +120,7 @@ class CaptureBoardHandler:
         response.state = state_msg
         response.ok = True
         response.note = "Board captured successfully"
+
+        self.board_state_manager.publish_board_state(state_msg)
 
         return response

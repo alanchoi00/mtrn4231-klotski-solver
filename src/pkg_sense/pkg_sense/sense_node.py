@@ -7,10 +7,9 @@ from klotski_interfaces.srv._capture_board import (CaptureBoard,
                                                    CaptureBoard_Response)
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
-from std_msgs.msg import String
 
 from .handlers import CaptureBoardHandler
-from .managers import CameraManager, TransformationManager
+from .managers import BoardStateManager, CameraManager, TransformationManager
 from .services import HSVConfig
 
 
@@ -232,10 +231,6 @@ class Sense(Node):
         hsv_config_file = os.path.join(pkg_share, 'config', hsv_config_filename)
         self.hsv_config = HSVConfig.load_hsv_config(hsv_config_file)
 
-        # Publishers
-        self.ui_pub = self.create_publisher(String, "/ui/events", 10)
-        self.board_state_pub = self.create_publisher(String, "/board_state", 10)
-
         # Service
         self.capture_board_service = self.create_service(
             CaptureBoard, "/sense/capture_board", self.capture_board_callback
@@ -243,11 +238,13 @@ class Sense(Node):
 
         self.camera = CameraManager(self)
         self.transformation = TransformationManager(self)
+        self.board_state_manager = BoardStateManager(self)
         self.capture_board_handler = CaptureBoardHandler(
             camera_manager=self.camera,
             tf_manager=self.transformation,
             clock=self.get_clock(),
             logger=self.get_logger(),
+            board_state_manager=self.board_state_manager,
             hsv_config=self.hsv_config,
             board_width_cells=self.board_width_cells,
             board_height_cells=self.board_height_cells,

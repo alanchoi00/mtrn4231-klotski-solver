@@ -10,7 +10,9 @@ if TYPE_CHECKING:
 
 
 class CameraManager:
-    """Manages camera subscriptions and image processing."""
+    """
+    Manages camera subscriptions and image processing.
+    """
     def __init__(self, node: "Sense"):
         self.node = node
         self.cv_bridge = CvBridge()
