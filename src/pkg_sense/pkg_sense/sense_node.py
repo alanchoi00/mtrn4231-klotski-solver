@@ -63,10 +63,34 @@ class Sense(Node):
             ),
         )
         self.declare_parameter(
-            "board_ref_marker_id",
+            "board_tl_marker_id",
             descriptor=ParameterDescriptor(
                 type=rclpy.Parameter.Type.INTEGER.value,
-                description="Reference marker ID for the board",
+                description="Top-left corner marker ID for the board",
+                read_only=True,
+            ),
+        )
+        self.declare_parameter(
+            "board_tr_marker_id",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.INTEGER.value,
+                description="Top-right corner marker ID for the board",
+                read_only=True,
+            ),
+        )
+        self.declare_parameter(
+            "board_bl_marker_id",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.INTEGER.value,
+                description="Bottom-left corner marker ID for the board",
+                read_only=True,
+            ),
+        )
+        self.declare_parameter(
+            "board_br_marker_id",
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.INTEGER.value,
+                description="Bottom-right corner marker ID for the board",
                 read_only=True,
             ),
         )
@@ -178,8 +202,23 @@ class Sense(Node):
             .get_parameter_value()
             .string_value
         )
-        self.board_ref_marker_id = (
-            self.get_parameter("board_ref_marker_id")
+        self.board_tl_marker_id = (
+            self.get_parameter("board_tl_marker_id")
+            .get_parameter_value()
+            .integer_value
+        )
+        self.board_tr_marker_id = (
+            self.get_parameter("board_tr_marker_id")
+            .get_parameter_value()
+            .integer_value
+        )
+        self.board_bl_marker_id = (
+            self.get_parameter("board_bl_marker_id")
+            .get_parameter_value()
+            .integer_value
+        )
+        self.board_br_marker_id = (
+            self.get_parameter("board_br_marker_id")
             .get_parameter_value()
             .integer_value
         )
@@ -242,9 +281,13 @@ class Sense(Node):
         self.capture_board_handler = CaptureBoardHandler(
             camera_manager=self.camera,
             tf_manager=self.transformation,
+            board_state_manager=self.board_state_manager,
             clock=self.get_clock(),
             logger=self.get_logger(),
-            board_state_manager=self.board_state_manager,
+            board_tl_marker_id=self.board_tl_marker_id,
+            board_tr_marker_id=self.board_tr_marker_id,
+            board_bl_marker_id=self.board_bl_marker_id,
+            board_br_marker_id=self.board_br_marker_id,
             hsv_config=self.hsv_config,
             board_width_cells=self.board_width_cells,
             board_height_cells=self.board_height_cells,

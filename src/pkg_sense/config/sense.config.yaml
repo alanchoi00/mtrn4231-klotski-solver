@@ -11,7 +11,15 @@ sense:
     camera_link_frame_id: "camera_link"
 
     # Board reference marker config
-    board_ref_marker_id: 2 # ID of the reference marker (bottom-left corner) on the board
+    #   TL ------ TR
+    #    |        |
+    #    |        |
+    #   BL ------ BR
+    #
+    board_tl_marker_id: 0 # ID of the top-left corner marker on the board
+    board_tr_marker_id: 1 # ID of the top-right corner marker on the board
+    board_bl_marker_id: 2 # ID of the bottom-left corner marker on the board
+    board_br_marker_id: 3 # ID of the bottom-right corner marker on the board
     marker_length_m: 0.065 # marker side length in meters
 
     # Board offset and frame ID

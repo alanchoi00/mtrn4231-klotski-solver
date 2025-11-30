@@ -19,6 +19,10 @@ class CaptureBoardHandler:
         board_state_manager: BoardStateManager,
         clock: Clock,
         logger: RcutilsLogger,
+        board_tl_marker_id: int,
+        board_tr_marker_id: int,
+        board_bl_marker_id: int,
+        board_br_marker_id: int,
         hsv_config: HSVConfig,
         board_width_cells: int,
         board_height_cells: int,
@@ -30,6 +34,10 @@ class CaptureBoardHandler:
         self.hsv_config = hsv_config
         self.clock = clock
         self.logger = logger
+        self.board_tl_marker_id = board_tl_marker_id
+        self.board_tr_marker_id = board_tr_marker_id
+        self.board_bl_marker_id = board_bl_marker_id
+        self.board_br_marker_id = board_br_marker_id
         self.board_width_cells = board_width_cells
         self.board_height_cells = board_height_cells
         self.min_cell_colour_area = min_cell_colour_area
@@ -62,6 +70,10 @@ class CaptureBoardHandler:
                 aruco_infos,
                 board_width_cells=self.board_width_cells,
                 board_height_cells=self.board_height_cells,
+                board_tl_marker_id=self.board_tl_marker_id,
+                board_tr_marker_id=self.board_tr_marker_id,
+                board_bl_marker_id=self.board_bl_marker_id,
+                board_br_marker_id=self.board_br_marker_id,
             )
         except Exception as e:
             response.ok = False
