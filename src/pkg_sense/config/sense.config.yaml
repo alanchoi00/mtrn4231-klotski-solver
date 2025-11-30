@@ -36,5 +36,5 @@ sense:
 
     world_frame_id: "base_link"
 
-    hsv_config_file: "hsv_ranges.default.yaml"
+    hsv_config_file: "hsv_ranges.default.yaml" # omitted path is relative to src/pkg_sense/config/
 
