@@ -1,28 +1,42 @@
+from __future__ import annotations
+
 from klotski_interfaces.srv._capture_board import CaptureBoard_Response
+from klotski_interfaces.msg import BoardState
 from rclpy.clock import Clock
 from rclpy.impl.rcutils_logger import RcutilsLogger
 
-from klotski_interfaces.msg import BoardState
-
 from ..managers import (
-    BoardStateManager,
     CameraManager,
     HSVConfigManager,
     TransformationManager,
+    BoardStateManager,
 )
+
 from ..services import (
-    annotate_cell_colors,
-    build_masks,
     detect_aruco_markers,
     get_missing_target_ids,
-    grid_to_board,
-    render_annotated_grid_overlay_image,
-    validate_board_configuration,
     warp_image_to_board,
+    build_masks,
+    annotate_cell_colors,
+    render_annotated_grid_overlay_image,
+    grid_to_board,
+    validate_board_configuration,
 )
 
 
 class CaptureBoardHandler:
+    """
+    Runs the FULL perception pipeline:
+    1) Get camera frame
+    2) Detect ArUco markers
+    3) Warp image to board
+    4) Colour classification per cell
+    5) Convert to Board message
+    6) Generate TF transforms
+    7) Validate board
+    8) Publish results
+    """
+
     def __init__(
         self,
         *,
@@ -42,125 +56,132 @@ class CaptureBoardHandler:
         board_height_cells: int,
         min_cell_colour_area: int,
     ):
-        self.camera_manager = camera_manager
-        self.tf_manager = tf_manager
-        self.board_state_manager = board_state_manager
-        self.hsv_config_manager = hsv_config_manager
+        self.camera = camera_manager
+        self.tf = tf_manager
+        self.board_state_mgr = board_state_manager
+        self.hsv_cfg = hsv_config_manager
         self.clock = clock
         self.logger = logger
+
+        # Board parameters
         self.board_frame = board_frame
         self.base_frame = base_frame
-        self.board_tl_marker_id = board_tl_marker_id
-        self.board_tr_marker_id = board_tr_marker_id
-        self.board_bl_marker_id = board_bl_marker_id
-        self.board_br_marker_id = board_br_marker_id
-        self.board_width_cells = board_width_cells
-        self.board_height_cells = board_height_cells
-        self.min_cell_colour_area = min_cell_colour_area
+        self.tl = board_tl_marker_id
+        self.tr = board_tr_marker_id
+        self.bl = board_bl_marker_id
+        self.br = board_br_marker_id
+        self.W = board_width_cells
+        self.H = board_height_cells
+        self.min_area = min_cell_colour_area
 
     def handle(self) -> CaptureBoard_Response:
-        response = CaptureBoard_Response(
-            ok=False, note="Uninitialized"
-        )  # default in case of early return
-
-        image = self.camera_manager.get_color_image()
-        if image is None:
-            response.ok = False
-            response.note = "No color image yet"
-            return response
-
-        image = image.copy()
-
-        aruco_infos = detect_aruco_markers(image)
-        missing_ids = get_missing_target_ids(aruco_infos)
-        if any(missing_ids):
-            response.ok = False
-            response.note = f"Missing markers with IDs: {missing_ids}"
-            return response
-
-        now = self.clock.now().to_msg()
+        """Top-level pipeline wrapper."""
+        response = CaptureBoard_Response(ok=False, note="Unknown error")
 
         try:
-            warped_image = warp_image_to_board(
+            self.logger.info("Starting board capture pipeline...")
+            image = self._step_acquire_image()
+            self.logger.debug("Acquired image from camera")
+            aruco_infos = self._step_detect_markers(image)
+            self.logger.debug(f"Detected {len(aruco_infos)} ArUco markers")
+            warped = self._step_warp_board(image, aruco_infos)
+            self.logger.debug("Warped image to board perspective")
+            _, grid = self._step_classify_cells(warped)
+            self.logger.debug("Classified cell colours")
+            board_msg = self._step_build_board(grid)
+            self.logger.debug("Built Board message from grid")
+            board_pose = self._step_update_transforms(aruco_infos)
+            self.logger.debug("Updated TF transforms for markers and board")
+            self._step_validate_board(grid, board_msg)
+            self.logger.debug("Validated board configuration")
+            state_msg = self._step_publish_output(board_msg, board_pose)
+            self.logger.info("Board capture pipeline completed successfully")
+
+            response.state = state_msg
+            response.ok = True
+            response.note = "Board captured successfully"
+
+        except Exception as e:
+            response.ok = False
+            response.note = str(e)
+            self.logger.error(f"Board capture pipeline failed: {e}")
+
+        return response
+
+    def _step_acquire_image(self):
+        image = self.camera.get_color_image()
+        if image is None:
+            raise RuntimeError("No color image available")
+        return image.copy()
+
+    def _step_detect_markers(self, image):
+        infos = detect_aruco_markers(image)
+        missing = get_missing_target_ids(infos)
+        if any(missing):
+            raise RuntimeError(f"Missing ArUco markers: {missing}")
+        return infos
+
+    def _step_warp_board(self, image, aruco_infos):
+        try:
+            warped = warp_image_to_board(
                 image,
                 aruco_infos,
-                board_width_cells=self.board_width_cells,
-                board_height_cells=self.board_height_cells,
-                board_tl_marker_id=self.board_tl_marker_id,
-                board_tr_marker_id=self.board_tr_marker_id,
-                board_bl_marker_id=self.board_bl_marker_id,
-                board_br_marker_id=self.board_br_marker_id,
+                board_width_cells=self.W,
+                board_height_cells=self.H,
+                board_tl_marker_id=self.tl,
+                board_tr_marker_id=self.tr,
+                board_bl_marker_id=self.bl,
+                board_br_marker_id=self.br,
             )
         except Exception as e:
-            response.ok = False
-            response.note = f"Error warping image: {e}"
-            return response
+            raise RuntimeError(f"Warping failed: {e}")
 
-        self.camera_manager.publish_warped_image(warped_image)
-        self.logger.debug("Warped image published")
+        self.camera.publish_warped_image(warped)
+        return warped
 
-        hsv_config = self.hsv_config_manager.get_hsv_config()
-        colour_masks = build_masks(warped_image, hsv_config)
-        annotated_grid = annotate_cell_colors(
-            warped_image,
-            colour_masks,
-            min_cell_colour_area=self.min_cell_colour_area,
-            board_width_cells=self.board_width_cells,
-            board_height_cells=self.board_height_cells,
+    def _step_classify_cells(self, warped_bgr):
+        hsv_cfg = self.hsv_cfg.get_hsv_config()
+
+        masks = build_masks(warped_bgr, hsv_cfg)
+        grid = annotate_cell_colors(
+            warped_bgr,
+            masks,
+            min_cell_colour_area=self.min_area,
+            board_width_cells=self.W,
+            board_height_cells=self.H,
         )
 
-        overlay_image = render_annotated_grid_overlay_image(
-            warped_image,
-            grid_bottom=annotated_grid,
-            board_width_cells=self.board_width_cells,
-            board_height_cells=self.board_height_cells,
+        overlay = render_annotated_grid_overlay_image(
+            warped_bgr,
+            grid_bottom=grid,
+            board_width_cells=self.W,
+            board_height_cells=self.H,
         )
+        self.camera.publish_overlay_image(overlay)
 
-        self.camera_manager.publish_overlay_image(overlay_image)
-        self.logger.debug("Overlay image published")
+        return masks, grid
 
-        try:
-            board_msg = grid_to_board(
-                annotated_grid,
-                board_width_cells=self.board_width_cells,
-                board_height_cells=self.board_height_cells,
-            )
-        except Exception as e:
-            response.ok = False
-            response.note = f"Error converting grid to board message: {e}"
-            return response
+    def _step_build_board(self, grid):
+        return grid_to_board(grid, board_width_cells=self.W, board_height_cells=self.H)
 
-        self.tf_manager.update_markers(
+    def _step_update_transforms(self, aruco_infos):
+        self.tf.update_markers(
             aruco_info=aruco_infos,
-            depth_image=self.camera_manager.get_depth_image(),
-            intrinsics=self.camera_manager.get_intrinsics(),
+            depth_image=self.camera.get_depth_image(),
+            intrinsics=self.camera.get_intrinsics(),
             stamp=self.clock.now(),
         )
-
-        board_pose_msg = self.tf_manager.get_board_pose_in_base(
+        return self.tf.get_board_pose_in_base(
             board_frame=self.board_frame,
             base_frame=self.base_frame,
             stamp=self.clock.now(),
         )
 
-        state_msg = BoardState(stamp=now, board=board_msg, board_pose=board_pose_msg)
+    def _step_validate_board(self, grid, board_msg):
+        validate_board_configuration(grid, board_msg, self.W, self.H)
 
-        try:
-            validate_board_configuration(
-                annotated_grid,
-                board_msg,
-                self.board_width_cells,
-                self.board_height_cells,
-            )
-        except Exception as e:
-            response.ok = False
-            response.note = f"Invalid board configuration: {e}"
-            return response
-
-        response.state = state_msg
-        response.ok = True
-        response.note = "Board captured successfully"
-
-        self.board_state_manager.publish_board_state(state_msg)
-
-        return response
+    def _step_publish_output(self, board_msg, board_pose):
+        now = self.clock.now().to_msg()
+        state_msg = BoardState(stamp=now, board=board_msg, board_pose=board_pose)
+        self.board_state_mgr.publish_board_state(state_msg)
+        return state_msg
