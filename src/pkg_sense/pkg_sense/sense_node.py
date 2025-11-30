@@ -1,5 +1,6 @@
 from .types import BoardConfig, PieceCounts, CameraConfig, FramesConfig
 from rclpy.node import Node
+import rclpy
 
 from klotski_interfaces.srv import CaptureBoard
 from klotski_utils import declare_param
@@ -137,7 +138,7 @@ class Sense(Node):
 
         hsv_file = declare_param[str](self, "hsv_config_file", "HSV config file path")
 
-        self.camera = CameraManager(self)
+        self.camera = CameraManager(self, self.frames_config.world)
         self.hsv_config_manager = HSVConfigManager(self, hsv_file)
         self.board_state_manager = BoardStateManager(self)
 
@@ -172,3 +173,19 @@ class Sense(Node):
 
     def capture_board_callback(self, request, response):
         return self.capture_board_handler.handle()
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Sense()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
