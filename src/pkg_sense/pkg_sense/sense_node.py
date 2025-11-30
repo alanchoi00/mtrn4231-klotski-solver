@@ -1,316 +1,174 @@
-import rclpy
-from klotski_interfaces.srv._capture_board import (
-    CaptureBoard,
-    CaptureBoard_Request,
-    CaptureBoard_Response,
-)
-from rcl_interfaces.msg import ParameterDescriptor
+from .types import BoardConfig, PieceCounts, CameraConfig, FramesConfig
 from rclpy.node import Node
+
+from klotski_interfaces.srv import CaptureBoard
+from klotski_utils import declare_param
 
 from .handlers import CaptureBoardHandler
 from .managers import (
-    BoardStateManager,
     CameraManager,
     HSVConfigManager,
+    BoardStateManager,
     TransformationManager,
 )
 
 
 class Sense(Node):
-    """
-    Sense node for the Klotski solver.
-    """
+    """Node for sensing the board state."""
 
     def __init__(self):
         super().__init__("sense")
 
-        # Declare parameters with descriptors
-        self.declare_parameter(
+        # Board geometry
+        board_width = declare_param[int](
+            self,
             "board_width_cells",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Width of the board in cells",
-                read_only=True,
-            ),
+            "Width of the board in cells",
         )
-        self.declare_parameter(
+        board_height = declare_param[int](
+            self,
             "board_height_cells",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Height of the board in cells",
-                read_only=True,
-            ),
+            "Height of the board in cells",
         )
-        self.declare_parameter(
-            "min_cell_colour_area",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Minimum area for cell colour detection",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "camera_frame_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.STRING.value,
-                description="Frame ID for the camera",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "camera_link_frame_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.STRING.value,
-                description="Frame ID for the camera link",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "board_tl_marker_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Top-left corner marker ID for the board",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "board_tr_marker_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Top-right corner marker ID for the board",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "board_bl_marker_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Bottom-left corner marker ID for the board",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "board_br_marker_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Bottom-right corner marker ID for the board",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
-            "marker_length_m",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.DOUBLE.value,
-                description="Length of the marker in meters",
-                read_only=True,
-            ),
-        )
-        self.declare_parameter(
+        offset_x = declare_param[float](
+            self,
             "board_offset_x_m",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.DOUBLE.value,
-                description="X offset of the board in meters",
-                read_only=True,
-            ),
+            "Board X offset",
         )
-        self.declare_parameter(
+        offset_y = declare_param[float](
+            self,
             "board_offset_y_m",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.DOUBLE.value,
-                description="Y offset of the board in meters",
-                read_only=True,
-            ),
+            "Board Y offset",
         )
-        self.declare_parameter(
+        board_frame = declare_param[str](
+            self,
             "board_frame_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.STRING.value,
-                description="Frame ID for the board",
-                read_only=True,
-            ),
+            "Board frame ID",
         )
-        self.declare_parameter(
-            "board_piece_counts.red",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Counts of each red piece on the board",
-                read_only=True,
-            ),
+        tl = declare_param[int](
+            self,
+            "board_tl_marker_id",
+            "TL marker ID",
         )
-        self.declare_parameter(
-            "board_piece_counts.green",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Counts of each green piece on the board",
-                read_only=True,
-            ),
+        tr = declare_param[int](
+            self,
+            "board_tr_marker_id",
+            "TR marker ID",
         )
-        self.declare_parameter(
-            "board_piece_counts.blue",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Counts of each blue piece on the board",
-                read_only=True,
-            ),
+        bl = declare_param[int](
+            self,
+            "board_bl_marker_id",
+            "BL marker ID",
         )
-        self.declare_parameter(
-            "board_piece_counts.yellow",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Counts of each yellow piece on the board",
-                read_only=True,
-            ),
+        br = declare_param[int](
+            self,
+            "board_br_marker_id",
+            "BR marker ID",
         )
-        self.declare_parameter(
-            "board_piece_counts.empty",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.INTEGER.value,
-                description="Counts of each empty piece on the board",
-                read_only=True,
-            ),
+        marker_len = declare_param[float](
+            self,
+            "marker_length_m",
+            "Marker size (m)",
         )
-        self.declare_parameter(
-            "world_frame_id",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.STRING.value,
-                description="Frame ID for the world",
-                read_only=True,
-            ),
+
+        self.board_config = BoardConfig(
+            width=board_width,
+            height=board_height,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            frame_id=board_frame,
+            tl_marker=tl,
+            tr_marker=tr,
+            bl_marker=bl,
+            br_marker=br,
+            marker_length=marker_len,
         )
-        self.declare_parameter(
-            "hsv_config_file",
-            descriptor=ParameterDescriptor(
-                type=rclpy.Parameter.Type.STRING.value,
-                description="Path to HSV configuration file",
-                read_only=True,
+
+        # Camera
+        self.camera_config = CameraConfig(
+            frame_id=declare_param[str](self, "camera_frame_id", "Camera frame ID"),
+            link_frame_id=declare_param[str](
+                self,
+                "camera_link_frame_id",
+                "Camera link frame ID",
             ),
         )
 
-        self.board_width_cells = (
-            self.get_parameter("board_width_cells").get_parameter_value().integer_value
+        # Piece counts
+        self.piece_counts = PieceCounts(
+            red=declare_param[int](
+                self,
+                "board_piece_counts.red",
+                "Red piece count",
+            ),
+            green=declare_param[int](
+                self,
+                "board_piece_counts.green",
+                "Green piece count",
+            ),
+            blue=declare_param[int](
+                self,
+                "board_piece_counts.blue",
+                "Blue piece count",
+            ),
+            yellow=declare_param[int](
+                self,
+                "board_piece_counts.yellow",
+                "Yellow piece count",
+            ),
+            empty=declare_param[int](
+                self,
+                "board_piece_counts.empty",
+                "Empty piece count",
+            ),
         )
-        self.board_height_cells = (
-            self.get_parameter("board_height_cells").get_parameter_value().integer_value
+
+        # Other configs
+        self.min_cell_colour_area = declare_param[int](
+            self,
+            "min_cell_colour_area",
+            "Min cell color area",
         )
-        self.min_cell_colour_area = (
-            self.get_parameter("min_cell_colour_area")
-            .get_parameter_value()
-            .integer_value
+
+        self.frames_config = FramesConfig(
+            world=declare_param[str](self, "world_frame_id", "World frame"),
+            board=self.board_config.frame_id,
         )
-        self.camera_frame_id = (
-            self.get_parameter("camera_frame_id").get_parameter_value().string_value
-        )
-        self.camera_link_frame_id = (
-            self.get_parameter("camera_link_frame_id")
-            .get_parameter_value()
-            .string_value
-        )
-        self.board_tl_marker_id = (
-            self.get_parameter("board_tl_marker_id").get_parameter_value().integer_value
-        )
-        self.board_tr_marker_id = (
-            self.get_parameter("board_tr_marker_id").get_parameter_value().integer_value
-        )
-        self.board_bl_marker_id = (
-            self.get_parameter("board_bl_marker_id").get_parameter_value().integer_value
-        )
-        self.board_br_marker_id = (
-            self.get_parameter("board_br_marker_id").get_parameter_value().integer_value
-        )
-        self.marker_length_m = (
-            self.get_parameter("marker_length_m").get_parameter_value().double_value
-        )
-        self.board_offset_x_m = (
-            self.get_parameter("board_offset_x_m").get_parameter_value().double_value
-        )
-        self.board_offset_y_m = (
-            self.get_parameter("board_offset_y_m").get_parameter_value().double_value
-        )
-        self.board_frame_id = (
-            self.get_parameter("board_frame_id").get_parameter_value().string_value
-        )
-        self.board_piece_counts_red = (
-            self.get_parameter("board_piece_counts.red")
-            .get_parameter_value()
-            .integer_value
-        )
-        self.board_piece_counts_green = (
-            self.get_parameter("board_piece_counts.green")
-            .get_parameter_value()
-            .integer_value
-        )
-        self.board_piece_counts_blue = (
-            self.get_parameter("board_piece_counts.blue")
-            .get_parameter_value()
-            .integer_value
-        )
-        self.board_piece_counts_yellow = (
-            self.get_parameter("board_piece_counts.yellow")
-            .get_parameter_value()
-            .integer_value
-        )
-        self.board_piece_counts_empty = (
-            self.get_parameter("board_piece_counts.empty")
-            .get_parameter_value()
-            .integer_value
-        )
-        self.world_frame_id = (
-            self.get_parameter("world_frame_id").get_parameter_value().string_value
-        )
-        hsv_config_filename = (
-            self.get_parameter("hsv_config_file").get_parameter_value().string_value
-        )
+
+        hsv_file = declare_param[str](self, "hsv_config_file", "HSV config file path")
 
         self.camera = CameraManager(self)
+        self.hsv_config_manager = HSVConfigManager(self, hsv_file)
+        self.board_state_manager = BoardStateManager(self)
+
         self.transformation_manager = TransformationManager(
             self,
-            base_frame="base_link",
-            camera_frame=self.camera_frame_id,
-            board_frame="klotski_board",
-            board_marker_length_m=self.marker_length_m,
-            board_ref_marker_id=self.board_bl_marker_id,
-            board_offset_x_m=self.board_offset_x_m,
-            board_offset_y_m=self.board_offset_y_m,
+            base_frame=self.frames_config.world,
+            camera_frame=self.camera_config.frame_id,
+            board_frame=self.board_config.frame_id,
+            board_marker_length_m=self.board_config.marker_length,
+            board_ref_marker_id=self.board_config.bl_marker,
+            board_offset_x_m=self.board_config.offset_x,
+            board_offset_y_m=self.board_config.offset_y,
         )
-        self.board_state_manager = BoardStateManager(self)
-        self.hsv_config_manager = HSVConfigManager(self, hsv_config_filename)
 
-        # Service
-        self.capture_board_service = self.create_service(
-            CaptureBoard, "/sense/capture_board", self.capture_board_callback
-        )
-        # Handlers
         self.capture_board_handler = CaptureBoardHandler(
             camera_manager=self.camera,
             tf_manager=self.transformation_manager,
             hsv_config_manager=self.hsv_config_manager,
             board_state_manager=self.board_state_manager,
-            clock=self.get_clock(),
-            logger=self.get_logger(),
-            board_tl_marker_id=self.board_tl_marker_id,
-            board_tr_marker_id=self.board_tr_marker_id,
-            board_bl_marker_id=self.board_bl_marker_id,
-            board_br_marker_id=self.board_br_marker_id,
-            board_width_cells=self.board_width_cells,
-            board_height_cells=self.board_height_cells,
+            board_config=self.board_config,
+            piece_counts=self.piece_counts,
+            base_frame=self.frames_config.world,
             min_cell_colour_area=self.min_cell_colour_area,
+            logger=self.get_logger(),
+            clock=self.get_clock(),
         )
 
+        self.create_service(
+            CaptureBoard, "/sense/capture_board", self.capture_board_callback
+        )
         self.get_logger().info("sense ready: /sense/capture_board")
 
-    def capture_board_callback(
-        self, request: CaptureBoard_Request, response: CaptureBoard_Response
-    ) -> CaptureBoard_Response:
-        self.get_logger().info("capture_board_callback called")
+    def capture_board_callback(self, request, response):
         return self.capture_board_handler.handle()
-
-
-def main():
-    rclpy.init()
-    sense = Sense()
-    rclpy.spin(sense)
-    rclpy.shutdown()
-
-
-if __name__ == "__main__":
-    main()

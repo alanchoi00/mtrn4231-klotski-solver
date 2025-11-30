@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from klotski_interfaces.srv._capture_board import CaptureBoard_Response
 from klotski_interfaces.msg import BoardState
+from ..types import BoardConfig, PieceCounts
 from rclpy.clock import Clock
 from rclpy.impl.rcutils_logger import RcutilsLogger
 
@@ -46,14 +47,9 @@ class CaptureBoardHandler:
         hsv_config_manager: HSVConfigManager,
         clock: Clock,
         logger: RcutilsLogger,
-        board_frame: str,
+        board_config: BoardConfig,
+        piece_counts: PieceCounts,
         base_frame: str,
-        board_tl_marker_id: int,
-        board_tr_marker_id: int,
-        board_bl_marker_id: int,
-        board_br_marker_id: int,
-        board_width_cells: int,
-        board_height_cells: int,
         min_cell_colour_area: int,
     ):
         self.camera = camera_manager
@@ -64,15 +60,16 @@ class CaptureBoardHandler:
         self.logger = logger
 
         # Board parameters
-        self.board_frame = board_frame
+        self.board_frame = board_config.frame_id
         self.base_frame = base_frame
-        self.tl = board_tl_marker_id
-        self.tr = board_tr_marker_id
-        self.bl = board_bl_marker_id
-        self.br = board_br_marker_id
-        self.W = board_width_cells
-        self.H = board_height_cells
+        self.tl = board_config.tl_marker
+        self.tr = board_config.tr_marker
+        self.bl = board_config.bl_marker
+        self.br = board_config.br_marker
+        self.W = board_config.width
+        self.H = board_config.height
         self.min_area = min_cell_colour_area
+        self.piece_counts = piece_counts
 
     def handle(self) -> CaptureBoard_Response:
         """Top-level pipeline wrapper."""
@@ -178,7 +175,7 @@ class CaptureBoardHandler:
         )
 
     def _step_validate_board(self, grid, board_msg):
-        validate_board_configuration(grid, board_msg, self.W, self.H)
+        validate_board_configuration(grid, board_msg, self.W, self.H, self.piece_counts)
 
     def _step_publish_output(self, board_msg, board_pose):
         now = self.clock.now().to_msg()

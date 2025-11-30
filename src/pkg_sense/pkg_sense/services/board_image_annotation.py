@@ -9,6 +9,7 @@ from .colour_mask import Masks
 
 Grid = List[List[ColourName]]
 
+
 @dataclass
 class CellBounds:
     x0: int
@@ -32,7 +33,6 @@ class CellBounds:
         return int(np.count_nonzero(mask[cell_slice]))
 
 
-
 def determine_cell_color(
     areas: Dict[ColourName, int],
     min_area: int,
@@ -46,6 +46,7 @@ def determine_cell_color(
     if best_area < min_area:
         return "empty"
     return best_colour
+
 
 def annotate_cell_colors(
     image: np.ndarray,
@@ -69,17 +70,16 @@ def annotate_cell_colors(
         row: List[ColourName] = []
         for c in range(board_width_cells):
             bounds = CellBounds.from_row_col(r_top, c, cell_w, cell_h)
-            areas: Dict[ColourName, int] = {name: bounds.compute_colour_area(mask) for name, mask in masks.items()}
+            areas: Dict[ColourName, int] = {
+                name: bounds.compute_colour_area(mask) for name, mask in masks.items()
+            }
             colour = determine_cell_color(areas, min_cell_colour_area)
             row.append(colour)
         grid_top.append(row)
 
     height = len(grid_top)
     width = len(grid_top[0]) if height > 0 else 0
-    return [
-        [grid_top[height - 1 - r][c] for c in range(width)]
-        for r in range(height)
-    ]
+    return [[grid_top[height - 1 - r][c] for c in range(width)] for r in range(height)]
 
 
 def render_annotated_grid_overlay_image(
@@ -108,7 +108,7 @@ def render_annotated_grid_overlay_image(
                 (x_slice.start, y_slice.start),
                 (x_slice.stop, y_slice.stop),
                 (0, 0, 0),
-                1
+                1,
             )
             cv2.putText(
                 overlay,
