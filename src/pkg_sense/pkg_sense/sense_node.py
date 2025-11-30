@@ -263,16 +263,15 @@ class Sense(Node):
             self.get_parameter("hsv_config_file").get_parameter_value().string_value
         )
 
-        # Service
-        self.capture_board_service = self.create_service(
-            CaptureBoard, "/sense/capture_board", self.capture_board_callback
-        )
-
         self.camera = CameraManager(self)
         self.transformation = TransformationManager(self)
         self.board_state_manager = BoardStateManager(self)
         self.hsv_config_manager = HSVConfigManager(self, hsv_config_filename)
 
+        # Service
+        self.capture_board_service = self.create_service(
+            CaptureBoard, "/sense/capture_board", self.capture_board_callback
+        )
         # Handlers
         self.capture_board_handler = CaptureBoardHandler(
             camera_manager=self.camera,
