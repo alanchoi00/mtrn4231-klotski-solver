@@ -1,4 +1,0 @@
-klotski_interfaces/HSVRange red
-klotski_interfaces/HSVRange yellow
-klotski_interfaces/HSVRange green
-klotski_interfaces/HSVRange blue
