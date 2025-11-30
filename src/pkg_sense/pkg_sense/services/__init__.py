@@ -4,7 +4,6 @@ from .board_image_annotation import (Grid, annotate_cell_colors,
                                      determine_cell_color,
                                      render_annotated_grid_overlay_image)
 from .colour_mask import build_masks
-from .hsv_config import HSVConfig
 from .validate_board import validate_board_configuration
 from .warp_board_image import warp_image_to_board
 
@@ -17,7 +16,6 @@ __all__ = [
     "render_annotated_grid_overlay_image",
     "annotate_cell_colors",
     "build_masks",
-    "HSVConfig",
     "validate_board_configuration",
     "warp_image_to_board"
 ]

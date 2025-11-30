@@ -1,7 +1,4 @@
-import os
-
 import rclpy
-from ament_index_python.packages import get_package_share_directory
 from klotski_interfaces.srv._capture_board import (CaptureBoard,
                                                    CaptureBoard_Request,
                                                    CaptureBoard_Response)
@@ -9,8 +6,8 @@ from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from .handlers import CaptureBoardHandler
-from .managers import BoardStateManager, CameraManager, TransformationManager
-from .services import HSVConfig
+from .managers import (BoardStateManager, CameraManager, HSVConfigManager,
+                       TransformationManager)
 
 
 class Sense(Node):
@@ -266,10 +263,6 @@ class Sense(Node):
             self.get_parameter("hsv_config_file").get_parameter_value().string_value
         )
 
-        pkg_share = get_package_share_directory('pkg_sense')
-        hsv_config_file = os.path.join(pkg_share, 'config', hsv_config_filename)
-        self.hsv_config = HSVConfig.load_hsv_config(hsv_config_file)
-
         # Service
         self.capture_board_service = self.create_service(
             CaptureBoard, "/sense/capture_board", self.capture_board_callback
@@ -278,9 +271,13 @@ class Sense(Node):
         self.camera = CameraManager(self)
         self.transformation = TransformationManager(self)
         self.board_state_manager = BoardStateManager(self)
+        self.hsv_config_manager = HSVConfigManager(self, hsv_config_filename)
+
+        # Handlers
         self.capture_board_handler = CaptureBoardHandler(
             camera_manager=self.camera,
             tf_manager=self.transformation,
+            hsv_config_manager=self.hsv_config_manager,
             board_state_manager=self.board_state_manager,
             clock=self.get_clock(),
             logger=self.get_logger(),
@@ -288,7 +285,6 @@ class Sense(Node):
             board_tr_marker_id=self.board_tr_marker_id,
             board_bl_marker_id=self.board_bl_marker_id,
             board_br_marker_id=self.board_br_marker_id,
-            hsv_config=self.hsv_config,
             board_width_cells=self.board_width_cells,
             board_height_cells=self.board_height_cells,
             min_cell_colour_area=self.min_cell_colour_area,

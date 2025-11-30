@@ -4,8 +4,9 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 
 from klotski_interfaces.msg import BoardState
 
-from ..managers import BoardStateManager, CameraManager, TransformationManager
-from ..services import (HSVConfig, annotate_cell_colors, build_masks,
+from ..managers import (BoardStateManager, CameraManager, HSVConfigManager,
+                        TransformationManager)
+from ..services import (annotate_cell_colors, build_masks,
                         detect_aruco_markers, get_missing_target_ids,
                         grid_to_board, render_annotated_grid_overlay_image,
                         validate_board_configuration, warp_image_to_board)
@@ -17,13 +18,13 @@ class CaptureBoardHandler:
         camera_manager: CameraManager,
         tf_manager: TransformationManager,
         board_state_manager: BoardStateManager,
+        hsv_config_manager: HSVConfigManager,
         clock: Clock,
         logger: RcutilsLogger,
         board_tl_marker_id: int,
         board_tr_marker_id: int,
         board_bl_marker_id: int,
         board_br_marker_id: int,
-        hsv_config: HSVConfig,
         board_width_cells: int,
         board_height_cells: int,
         min_cell_colour_area: int,
@@ -31,7 +32,7 @@ class CaptureBoardHandler:
         self.camera_manager = camera_manager
         self.tf_manager = tf_manager
         self.board_state_manager = board_state_manager
-        self.hsv_config = hsv_config
+        self.hsv_config_manager = hsv_config_manager
         self.clock = clock
         self.logger = logger
         self.board_tl_marker_id = board_tl_marker_id
@@ -83,7 +84,8 @@ class CaptureBoardHandler:
         self.camera_manager.publish_warped_image(warped_image)
         self.logger.debug("Warped image published")
 
-        colour_masks = build_masks(warped_image, self.hsv_config)
+        hsv_config = self.hsv_config_manager.get_hsv_config()
+        colour_masks = build_masks(warped_image, hsv_config)
         annotated_grid = annotate_cell_colors(
             warped_image,
             colour_masks,

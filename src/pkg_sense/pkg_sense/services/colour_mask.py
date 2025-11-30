@@ -2,8 +2,9 @@ from typing import Dict
 
 import cv2
 import numpy as np
+
 from ..constants import ColourName
-from .hsv_config import HSVConfig
+from ..managers.hsv_config_manager import HSVConfig
 
 Masks = Dict[ColourName, np.ndarray]
 
