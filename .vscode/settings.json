@@ -25,6 +25,8 @@
     "editor.tabSize": 4,
     "files.saveConflictResolution": "overwriteFileOnDisk"
   },
+  "python.analysis.autoIndent": true,
+  "python.analysis.typeCheckingMode": "basic",
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit",
     "source.organizeImports": "explicit"

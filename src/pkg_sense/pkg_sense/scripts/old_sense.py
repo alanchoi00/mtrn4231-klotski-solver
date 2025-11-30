@@ -1,47 +1,47 @@
-from klotski_interfaces.srv._capture_board import CaptureBoard_Response
-import rclpy
-import cv2
-import tf2_ros
 import os
+
+import cv2
 import numpy as np
 import pyrealsense2 as rs
+import rclpy
+import tf2_ros
 from cv_bridge import CvBridge
-
-from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped, TransformStamped
+from klotski_interfaces.srv._capture_board import CaptureBoard_Response
 from rclpy.duration import Duration
+from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String
-from sensor_msgs.msg import Image, CameraInfo
+from tf2_geometry_msgs import do_transform_pose
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-from geometry_msgs.msg import TransformStamped, PoseStamped
 
 from klotski_interfaces.msg import Board, BoardSpec, BoardState, Cell, Piece
 from klotski_interfaces.srv import CaptureBoard
-from tf2_geometry_msgs import do_transform_pose
 
 # ------------------------------
 # CONFIG
-W, H = 4, 5                     # grid: cols × rows
+W, H = 4, 5  # grid: cols × rows
 ARUCO_DICT = cv2.aruco.DICT_ARUCO_ORIGINAL
-MIN_CELL_COLOUR_AREA = 400      # area in pixels to count a cell as filled
+MIN_CELL_COLOUR_AREA = 400  # area in pixels to count a cell as filled
 
 # TF / ARUCO CONFIG (MATCH OTHER GROUPS)
-CAMERA_FRAME = "camera_color_optical_frame"   # RealSense color optical frame
-CAMERA_LINK_FRAME = "camera_link"            # for marker_pose target frame
-BOARD_MARKER_ID = 2                          # bottom-left marker ID
-BOARD_MARKER_LENGTH_M = 0.065                # <<< UPDATED marker side length (m)
-BOARD_OFFSET_X_M = 0.040                     # 40 mm to the right (marker frame X)
-BOARD_OFFSET_Y_M = 0.040                     # 40 mm up (marker frame Y)
-BOARD_FRAME_NAME = "klotski_board"           # board frame (bottom-left of board)
+CAMERA_FRAME = "camera_color_optical_frame"  # RealSense color optical frame
+CAMERA_LINK_FRAME = "camera_link"  # for marker_pose target frame
+BOARD_MARKER_ID = 2  # bottom-left marker ID
+BOARD_MARKER_LENGTH_M = 0.065  # <<< UPDATED marker side length (m)
+BOARD_OFFSET_X_M = 0.040  # 40 mm to the right (marker frame X)
+BOARD_OFFSET_Y_M = 0.040  # 40 mm up (marker frame Y)
+BOARD_FRAME_NAME = "klotski_board"  # board frame (bottom-left of board)
 
-# HSV thresholds 
+# HSV thresholds
 HSV_RANGES = {
-    "red1":   ((0,   100,  80), (10,  255, 255)),
-    "red2":   ((170, 100,  80), (180, 255, 255)),
-    "yellow": ((24, 10, 69), (59,  255, 255)),
-    "green":  ((44,   32,  76), (94,  255, 255)),
-    "blue":   ((95,   198,  0), (130, 255, 156)),
-    "grey":   ((0,     0,  50), (180,  70, 230)),   # low-saturation greys
+    "red1": ((0, 100, 80), (10, 255, 255)),
+    "red2": ((170, 100, 80), (180, 255, 255)),
+    "yellow": ((24, 10, 69), (59, 255, 255)),
+    "green": ((44, 32, 76), (94, 255, 255)),
+    "blue": ((95, 198, 0), (130, 255, 156)),
+    "grey": ((0, 0, 50), (180, 70, 230)),  # low-saturation greys
 }
 
 PIECE_TYPE_2_2 = getattr(Piece, "TYPE_2_2", 1)  # 2 by 2
@@ -49,10 +49,10 @@ PIECE_TYPE_1_2 = getattr(Piece, "TYPE_1_2", 2)  # 1 by 2 (horizontal)
 PIECE_TYPE_2_1 = getattr(Piece, "TYPE_2_1", 3)  # 2 by 1 (vertical)
 PIECE_TYPE_1_1 = getattr(Piece, "TYPE_1_1", 4)  # 1 by 1
 
-COLOR_NONE   = getattr(Piece, "COLOR_NONE",   0)
-COLOR_RED    = getattr(Piece, "COLOR_RED",    1)
-COLOR_BLUE   = getattr(Piece, "COLOR_BLUE",   2)
-COLOR_GREEN  = getattr(Piece, "COLOR_GREEN",  3)
+COLOR_NONE = getattr(Piece, "COLOR_NONE", 0)
+COLOR_RED = getattr(Piece, "COLOR_RED", 1)
+COLOR_BLUE = getattr(Piece, "COLOR_BLUE", 2)
+COLOR_GREEN = getattr(Piece, "COLOR_GREEN", 3)
 COLOR_YELLOW = getattr(Piece, "COLOR_YELLOW", 4)
 
 
@@ -122,7 +122,9 @@ def detect_aruco_info(image_bgr):
             detector = aruco.ArucoDetector(dictionary, params)
             corners_list, ids, _ = detector.detectMarkers(gray)
         except Exception:
-            corners_list, ids, _ = aruco.detectMarkers(gray, dictionary, parameters=params)
+            corners_list, ids, _ = aruco.detectMarkers(
+                gray, dictionary, parameters=params
+            )
 
         if ids is None:
             continue
@@ -174,21 +176,23 @@ def compute_homography_auto(info):
     BR = inner_corner(3)
     BL = inner_corner(2)
 
-    width_px  = np.linalg.norm(TR - TL)
+    width_px = np.linalg.norm(TR - TL)
     height_px = np.linalg.norm(BL - TL)
     cell_px_w = width_px / W
     cell_px_h = height_px / H
-    cell_px   = (cell_px_w + cell_px_h) / 2.0
+    cell_px = (cell_px_w + cell_px_h) / 2.0
 
     out_w = int(round(W * cell_px))
     out_h = int(round(H * cell_px))
 
-    dst_pts = np.float32([
-        [0,      0     ],   # TL
-        [out_w,  0     ],   # TR
-        [out_w,  out_h ],   # BR
-        [0,      out_h ],   # BL
-    ])
+    dst_pts = np.float32(
+        [
+            [0, 0],  # TL
+            [out_w, 0],  # TR
+            [out_w, out_h],  # BR
+            [0, out_h],  # BL
+        ]
+    )
     src_pts = np.float32([TL, TR, BR, BL])
     Hmat, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 3.0)
     if Hmat is None:
@@ -205,14 +209,17 @@ def warp_board(image_bgr, Hmat, size):
 # COLOUR DETECTION
 def build_colour_masks(warped_bgr):
     hsv = cv2.cvtColor(warped_bgr, cv2.COLOR_BGR2HSV)
-    def mask(lo, hi): return cv2.inRange(hsv, np.array(lo, np.uint8), np.array(hi, np.uint8))
+
+    def mask(lo, hi):
+        return cv2.inRange(hsv, np.array(lo, np.uint8), np.array(hi, np.uint8))
+
     red = mask(*HSV_RANGES["red1"]) | mask(*HSV_RANGES["red2"])
     masks = {
         "red": red,
         "yellow": mask(*HSV_RANGES["yellow"]),
-        "green":  mask(*HSV_RANGES["green"]),
-        "blue":   mask(*HSV_RANGES["blue"]),
-        "grey":   mask(*HSV_RANGES["grey"]),
+        "green": mask(*HSV_RANGES["green"]),
+        "blue": mask(*HSV_RANGES["blue"]),
+        "grey": mask(*HSV_RANGES["grey"]),
     }
     kernel = np.ones((5, 5), np.uint8)
     for k in masks:
@@ -253,8 +260,15 @@ def classify_cells(warped_bgr):
 
             grid_top[r_top][c] = colour
             cv2.rectangle(overlay, (x0, y0), (x1, y1), (0, 0, 0), 1)
-            cv2.putText(overlay, colour, (x0 + 3, y0 + 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1)
+            cv2.putText(
+                overlay,
+                colour,
+                (x0 + 3, y0 + 15),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 0, 0),
+                1,
+            )
 
     # flip to bottom-left origin
     grid_bottom = [["empty"] * W for _ in range(H)]
@@ -293,18 +307,26 @@ def grid_to_board(grid, rectified_size_px=None) -> Board:
         for c in range(W - 1):
             if any(visited[r + i][c + j] for i in (0, 1) for j in (0, 1)):
                 continue
-            if (grid[r][c] == "red" and grid[r + 1][c] == "red" and
-                grid[r][c + 1] == "red" and grid[r + 1][c + 1] == "red"):
+            if (
+                grid[r][c] == "red"
+                and grid[r + 1][c] == "red"
+                and grid[r][c + 1] == "red"
+                and grid[r + 1][c + 1] == "red"
+            ):
                 pm = Piece()
                 pm.type = PIECE_TYPE_2_2
                 pm.color = COLOR_RED
-                for (rr, cc) in [(r, c), (r + 1, c), (r, c + 1), (r + 1, c + 1)]:
+                for rr, cc in [(r, c), (r + 1, c), (r, c + 1), (r + 1, c + 1)]:
                     _add_cell(pm, rr, cc)
                     visited[rr][cc] = True
-                if hasattr(pm, "min_row"): pm.min_row = int(r)
-                if hasattr(pm, "min_col"): pm.min_col = int(c)
-                if hasattr(pm, "width"):   pm.width   = 2
-                if hasattr(pm, "height"):  pm.height  = 2
+                if hasattr(pm, "min_row"):
+                    pm.min_row = int(r)
+                if hasattr(pm, "min_col"):
+                    pm.min_col = int(c)
+                if hasattr(pm, "width"):
+                    pm.width = 2
+                if hasattr(pm, "height"):
+                    pm.height = 2
                 b.pieces.append(pm)
 
     # GREEN 2x1 (horizontal)
@@ -325,10 +347,14 @@ def grid_to_board(grid, rectified_size_px=None) -> Board:
                     _add_cell(pm, r, c0)
                     _add_cell(pm, r, c0 + 1)
                     visited[r][c0] = visited[r][c0 + 1] = True
-                    if hasattr(pm, "min_row"): pm.min_row = int(r)
-                    if hasattr(pm, "min_col"): pm.min_col = int(c0)
-                    if hasattr(pm, "width"):   pm.width   = 2
-                    if hasattr(pm, "height"):  pm.height  = 1
+                    if hasattr(pm, "min_row"):
+                        pm.min_row = int(r)
+                    if hasattr(pm, "min_col"):
+                        pm.min_col = int(c0)
+                    if hasattr(pm, "width"):
+                        pm.width = 2
+                    if hasattr(pm, "height"):
+                        pm.height = 1
                     b.pieces.append(pm)
                 # leftover odd green cell is ignored (invalid)
             else:
@@ -352,10 +378,14 @@ def grid_to_board(grid, rectified_size_px=None) -> Board:
                     _add_cell(pm, r0, c)
                     _add_cell(pm, r0 + 1, c)
                     visited[r0][c] = visited[r0 + 1][c] = True
-                    if hasattr(pm, "min_row"): pm.min_row = int(r0)
-                    if hasattr(pm, "min_col"): pm.min_col = int(c)
-                    if hasattr(pm, "width"):   pm.width   = 1
-                    if hasattr(pm, "height"):  pm.height  = 2
+                    if hasattr(pm, "min_row"):
+                        pm.min_row = int(r0)
+                    if hasattr(pm, "min_col"):
+                        pm.min_col = int(c)
+                    if hasattr(pm, "width"):
+                        pm.width = 1
+                    if hasattr(pm, "height"):
+                        pm.height = 2
                     b.pieces.append(pm)
                 # leftover odd blue cell is ignored (invalid)
             else:
@@ -370,10 +400,14 @@ def grid_to_board(grid, rectified_size_px=None) -> Board:
                 pm.color = COLOR_YELLOW
                 _add_cell(pm, r, c)
                 visited[r][c] = True
-                if hasattr(pm, "min_row"): pm.min_row = int(r)
-                if hasattr(pm, "min_col"): pm.min_col = int(c)
-                if hasattr(pm, "width"):   pm.width   = 1
-                if hasattr(pm, "height"):  pm.height  = 1
+                if hasattr(pm, "min_row"):
+                    pm.min_row = int(r)
+                if hasattr(pm, "min_col"):
+                    pm.min_col = int(c)
+                if hasattr(pm, "width"):
+                    pm.width = 1
+                if hasattr(pm, "height"):
+                    pm.height = 1
                 b.pieces.append(pm)
 
     # Diagnostics: leftover colored cells that didn't fit shapes
@@ -383,18 +417,34 @@ def grid_to_board(grid, rectified_size_px=None) -> Board:
             if not visited[r][c] and grid[r][c] in ("red", "green", "blue", "yellow"):
                 leftovers.append((r, c, grid[r][c]))
     if leftovers:
-        print(f"[klotski] WARNING: leftover colored cells not forming valid pieces: {leftovers}")
+        print(
+            f"[klotski] WARNING: leftover colored cells not forming valid pieces: {leftovers}"
+        )
 
     return b
 
 
 def validate_counts(grid, board: Board, node_logger=None) -> bool:
-    cnt_red   = sum(1 for p in board.pieces if p.color == COLOR_RED   and p.type == PIECE_TYPE_2_2)
-    cnt_green = sum(1 for p in board.pieces if p.color == COLOR_GREEN and p.type == PIECE_TYPE_1_2)
-    cnt_blue  = sum(1 for p in board.pieces if p.color == COLOR_BLUE  and p.type == PIECE_TYPE_2_1)
-    cnt_yel   = sum(1 for p in board.pieces if p.color == COLOR_YELLOW and p.type == PIECE_TYPE_1_1)
+    cnt_red = sum(
+        1 for p in board.pieces if p.color == COLOR_RED and p.type == PIECE_TYPE_2_2
+    )
+    cnt_green = sum(
+        1 for p in board.pieces if p.color == COLOR_GREEN and p.type == PIECE_TYPE_1_2
+    )
+    cnt_blue = sum(
+        1 for p in board.pieces if p.color == COLOR_BLUE and p.type == PIECE_TYPE_2_1
+    )
+    cnt_yel = sum(
+        1 for p in board.pieces if p.color == COLOR_YELLOW and p.type == PIECE_TYPE_1_1
+    )
     empty_cells = sum(1 for r in range(H) for c in range(W) if grid[r][c] == "empty")
-    ok = (cnt_blue == 4 and cnt_red == 1 and cnt_green == 1 and cnt_yel == 4 and empty_cells == 2)
+    ok = (
+        cnt_blue == 4
+        and cnt_red == 1
+        and cnt_green == 1
+        and cnt_yel == 4
+        and empty_cells == 2
+    )
     if not ok and node_logger:
         node_logger.warning(
             f"Invalid counts -> blue:{cnt_blue} red:{cnt_red} green:{cnt_green} "
@@ -408,7 +458,7 @@ def validate_counts(grid, board: Board, node_logger=None) -> bool:
 class Sense(Node):
 
     def __init__(self):
-        super().__init__('sense')
+        super().__init__("old_sense")
 
         # Subscriptions
         self.cv_bridge = CvBridge()
@@ -417,27 +467,39 @@ class Sense(Node):
         self.intrinsics = None  # rs.intrinsics
 
         self.image_sub = self.create_subscription(
-            Image, '/camera/camera/color/image_raw', self.arm_image_callback, 10
+            Image, "/camera/camera/color/image_raw", self.arm_image_callback, 10
         )
         self.point_cloud_sub = self.create_subscription(
-            Image, '/camera/camera/aligned_depth_to_color/image_raw', self.arm_point_cloud_callback, 10
+            Image,
+            "/camera/camera/aligned_depth_to_color/image_raw",
+            self.arm_point_cloud_callback,
+            10,
         )
         self.cam_info_sub = self.create_subscription(
-            CameraInfo, '/camera/camera/aligned_depth_to_color/camera_info', self.arm_image_depth_info_callback, 10
+            CameraInfo,
+            "/camera/camera/aligned_depth_to_color/camera_info",
+            self.arm_image_depth_info_callback,
+            10,
         )
 
-        self.declare_parameter('frame_id', 'base_link')   # world frame for Klotski system
+        self.declare_parameter(
+            "frame_id", "base_link"
+        )  # world frame for Klotski system
 
         # Publishers
-        self.ui_pub = self.create_publisher(String, '/ui/events', 10)
-        self.state_pub = self.create_publisher(BoardState, '/board_state', 10)
+        self.ui_pub = self.create_publisher(String, "/ui/events", 10)
+        self.state_pub = self.create_publisher(BoardState, "/board_state", 10)
 
         # Debug image publishers for rqt_image_view
-        self.debug_overlay_pub = self.create_publisher(Image, '/sense/cells_overlay', 1)
-        self.debug_warped_pub  = self.create_publisher(Image, '/sense/rectified_board', 1)
+        self.debug_overlay_pub = self.create_publisher(Image, "/sense/cells_overlay", 1)
+        self.debug_warped_pub = self.create_publisher(
+            Image, "/sense/rectified_board", 1
+        )
 
         # Service
-        self.srv = self.create_service(CaptureBoard, '/sense/capture_board', self.handle_capture_board)
+        self.srv = self.create_service(
+            CaptureBoard, "/sense/capture_board", self.handle_capture_board
+        )
 
         # TF
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
@@ -450,9 +512,9 @@ class Sense(Node):
         self.marker_bootstrap_count = {mid: 0 for mid in (0, 1, 2, 3)}
         self.marker_locked = {mid: False for mid in (0, 1, 2, 3)}
 
-        self.bootstrap_samples = 15          # frames before "lock" per marker
+        self.bootstrap_samples = 15  # frames before "lock" per marker
         self.bootstrap_spread_thresh = 0.02  # m; max spread to consider stable
-        self.outlier_thresh = 0.03           # m; reject if further than this from avg
+        self.outlier_thresh = 0.03  # m; reject if further than this from avg
 
         # --- Cached TF so frames stay in RViz even between service calls ---
         # key: child_frame_id, value: TransformStamped
@@ -525,9 +587,9 @@ class Sense(Node):
             intr.ppy = cameraInfo.k[5]
             intr.fx = cameraInfo.k[0]
             intr.fy = cameraInfo.k[4]
-            if cameraInfo.distortion_model == 'plumb_bob':
+            if cameraInfo.distortion_model == "plumb_bob":
                 intr.model = rs.distortion.brown_conrady
-            elif cameraInfo.distortion_model == 'equidistant':
+            elif cameraInfo.distortion_model == "equidistant":
                 intr.model = rs.distortion.kannala_brandt4
             else:
                 intr.model = rs.distortion.none
@@ -562,44 +624,56 @@ class Sense(Node):
 
         info = detect_aruco_info(image)
         if len(info) < 4:
-            response.note = f"Need markers 0,1,2,3; detected: {sorted(info.keys()) if info else []}"
+            response.note = (
+                f"Need markers 0,1,2,3; detected: {sorted(info.keys()) if info else []}"
+            )
             return response
 
         # Timestamp used for marker poses & state
         now_stamp = self.get_clock().now().to_msg()
 
         # --- compute 3D poses for all 4 markers in CAMERA_FRAME ---
-        marker_data_cam = {}   # id -> dict(pose=PoseStamped, R, tvec, quat)
+        marker_data_cam = {}  # id -> dict(pose=PoseStamped, R, tvec, quat)
 
         if self.intrinsics is None:
-            self.get_logger().warn("Intrinsics not ready; cannot compute marker 3D poses.")
+            self.get_logger().warn(
+                "Intrinsics not ready; cannot compute marker 3D poses."
+            )
         else:
             try:
                 cam = self.intrinsics
-                cameraMatrix = np.array([
-                    [cam.fx, 0,      cam.ppx],
-                    [0,      cam.fy, cam.ppy],
-                    [0,      0,      1.0]
-                ], dtype=np.float32)
+                cameraMatrix = np.array(
+                    [[cam.fx, 0, cam.ppx], [0, cam.fy, cam.ppy], [0, 0, 1.0]],
+                    dtype=np.float32,
+                )
                 distCoeffs = np.array(cam.coeffs, dtype=np.float32)
 
                 L = BOARD_MARKER_LENGTH_M
-                obj_points = np.array([
-                    [-L / 2,  L / 2, 0],
-                    [ L / 2,  L / 2, 0],
-                    [ L / 2, -L / 2, 0],
-                    [-L / 2, -L / 2, 0]
-                ], dtype=np.float32)
+                obj_points = np.array(
+                    [
+                        [-L / 2, L / 2, 0],
+                        [L / 2, L / 2, 0],
+                        [L / 2, -L / 2, 0],
+                        [-L / 2, -L / 2, 0],
+                    ],
+                    dtype=np.float32,
+                )
 
                 for mid in (0, 1, 2, 3):
                     if mid not in info:
-                        self.get_logger().warn(f"Marker {mid} not in detected info, skipping.")
+                        self.get_logger().warn(
+                            f"Marker {mid} not in detected info, skipping."
+                        )
                         continue
 
                     img_points = info[mid]["corners"].astype(np.float32)
-                    success, rvec, tvec = cv2.solvePnP(obj_points, img_points, cameraMatrix, distCoeffs)
+                    success, rvec, tvec = cv2.solvePnP(
+                        obj_points, img_points, cameraMatrix, distCoeffs
+                    )
                     if not success:
-                        self.get_logger().warn(f"solvePnP failed for marker {mid}, skipping.")
+                        self.get_logger().warn(
+                            f"solvePnP failed for marker {mid}, skipping."
+                        )
                         continue
 
                     R, _ = cv2.Rodrigues(rvec)
@@ -652,12 +726,16 @@ class Sense(Node):
                                 )
                                 # don't update history; use previous avg pose
                                 use_pos = prev_avg
-                                use_quat = self.average_quaternions(self.marker_rot_hist[mid])
+                                use_quat = self.average_quaternions(
+                                    self.marker_rot_hist[mid]
+                                )
                             else:
                                 hist.append(pos_vec)
                                 self.marker_rot_hist[mid].append(quat)
                                 use_pos = np.mean(hist, axis=0)
-                                use_quat = self.average_quaternions(self.marker_rot_hist[mid])
+                                use_quat = self.average_quaternions(
+                                    self.marker_rot_hist[mid]
+                                )
                         else:
                             # shouldn't really happen, but fallback to raw
                             use_pos = pos_vec
@@ -665,7 +743,11 @@ class Sense(Node):
 
                     # ---------------- Depth vs PnP debug for marker 2 in base frame ----------------
                     if mid == 2:
-                        base_frame = self.get_parameter('frame_id').get_parameter_value().string_value
+                        base_frame = (
+                            self.get_parameter("frame_id")
+                            .get_parameter_value()
+                            .string_value
+                        )
 
                         # --- PnP (smoothed) in base_frame ---
                         pnp_cam = PoseStamped()
@@ -683,9 +765,7 @@ class Sense(Node):
                         pb = None
                         try:
                             pnp_base = self.tf_buffer.transform(
-                                pnp_cam,
-                                base_frame,
-                                timeout=Duration(seconds=0.2)
+                                pnp_cam, base_frame, timeout=Duration(seconds=0.2)
                             )
                             pb = pnp_base.pose.position
                         except Exception as e:
@@ -714,9 +794,7 @@ class Sense(Node):
 
                             try:
                                 depth_base = self.tf_buffer.transform(
-                                    depth_cam,
-                                    base_frame,
-                                    timeout=Duration(seconds=0.2)
+                                    depth_cam, base_frame, timeout=Duration(seconds=0.2)
                                 )
                                 db = depth_base.pose.position
                             except Exception as e:
@@ -739,7 +817,6 @@ class Sense(Node):
                                 f"[marker 2] {base_frame} PnP (smoothed): "
                                 f"x={pb.x:.3f}, y={pb.y:.3f}, z={pb.z:.3f}  |  Depth: unavailable"
                             )
-
 
                     # --- build PoseStamped in CAMERA_FRAME using smoothed pose ---
                     pose_cam = PoseStamped()
@@ -777,7 +854,9 @@ class Sense(Node):
                     # cache for timer re-broadcast
                     self.cached_tf[f"aruco_{mid}"] = t_marker
 
-                self.get_logger().info("Published TF for aruco markers 0–3 in camera_color_optical_frame")
+                self.get_logger().info(
+                    "Published TF for aruco markers 0–3 in camera_color_optical_frame"
+                )
             except Exception as e:
                 self.get_logger().error(f"Error computing marker 3D poses: {e}")
 
@@ -809,7 +888,9 @@ class Sense(Node):
             except Exception as e:
                 self.get_logger().error(f"Error computing TF for board: {e}")
         else:
-            self.get_logger().warn("No 3D data for BOARD_MARKER_ID; TF for board not published.")
+            self.get_logger().warn(
+                "No 3D data for BOARD_MARKER_ID; TF for board not published."
+            )
 
         # --- Homography & grid detection ---
         try:
@@ -823,7 +904,9 @@ class Sense(Node):
 
         # Publish debug images
         try:
-            frame_id_param = self.get_parameter('frame_id').get_parameter_value().string_value
+            frame_id_param = (
+                self.get_parameter("frame_id").get_parameter_value().string_value
+            )
 
             overlay_msg = self.cv_bridge.cv2_to_imgmsg(overlay, encoding="bgr8")
             overlay_msg.header.stamp = now_stamp
@@ -850,13 +933,13 @@ class Sense(Node):
             pose_cam = marker_data_cam[mid]["pose"]
             try:
                 pose_out = self.tf_buffer.transform(
-                    pose_cam,
-                    target_frame,
-                    timeout=Duration(seconds=0.2)
+                    pose_cam, target_frame, timeout=Duration(seconds=0.2)
                 )
                 marker_poses_out.append(pose_out)
             except Exception as e:
-                self.get_logger().warn(f"Failed to transform marker {mid} pose to {target_frame}: {e}")
+                self.get_logger().warn(
+                    f"Failed to transform marker {mid} pose to {target_frame}: {e}"
+                )
 
         # Build BoardState
         state_msg = BoardState()
@@ -871,7 +954,11 @@ class Sense(Node):
 
         response.state = state_msg
         response.ok = bool(counts_ok)
-        response.note = "Captured" if counts_ok else "Captured, but piece counts invalid (want 4B,1R,1G,4Y,2 empty)"
+        response.note = (
+            "Captured"
+            if counts_ok
+            else "Captured, but piece counts invalid (want 4B,1R,1G,4Y,2 empty)"
+        )
         return response
 
 
@@ -882,5 +969,5 @@ def main():
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
