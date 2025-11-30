@@ -14,8 +14,9 @@ class CameraManager:
     Manages camera subscriptions and image processing.
     """
 
-    def __init__(self, node: "Sense"):
+    def __init__(self, node: "Sense", world_frame_id: str):
         self.node = node
+        self.world_frame_id = world_frame_id
         self.cv_bridge = CvBridge()
         self.cv_image: Optional[np.ndarray] = None
         self.depth_image: Optional[np.ndarray] = None
@@ -101,14 +102,14 @@ class CameraManager:
     def publish_overlay_image(self, image: np.ndarray):
         overlay_msg = self.cv_bridge.cv2_to_imgmsg(image, encoding="bgr8")
         overlay_msg.header.stamp = self.node.get_clock().now().to_msg()
-        overlay_msg.header.frame_id = self.node.world_frame_id
+        overlay_msg.header.frame_id = self.world_frame_id
         self.cells_overlay_image_pub.publish(overlay_msg)
         self.cache_overlay_image = image
 
     def publish_warped_image(self, image: np.ndarray):
         warped_msg = self.cv_bridge.cv2_to_imgmsg(image, encoding="bgr8")
         warped_msg.header.stamp = self.node.get_clock().now().to_msg()
-        warped_msg.header.frame_id = self.node.world_frame_id
+        warped_msg.header.frame_id = self.world_frame_id
         self.rectified_board_image_pub.publish(warped_msg)
         self.cache_rectified_image = image
 
