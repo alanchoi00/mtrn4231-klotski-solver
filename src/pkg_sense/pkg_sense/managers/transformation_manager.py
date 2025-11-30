@@ -34,10 +34,17 @@ class MarkerHistory:
 
 class TransformationManager:
     """
-    Owns TF broadcaster/listener and all marker pose smoothing.
-    Public API:
-        update_markers(...) -> dict[int, PoseStamped]
+    Manages ArUco marker transformations and TF broadcasting.
+    Public APIs:
+    ```python
+    TransformationManager.update_markers(...) -> dict[int, PoseStamped]
+    TransformationManager.get_board_pose_in_base(...) -> Optional[PoseStamped]
+    ```
     """
+
+    TF_RESOLUTION_S = 0.1  # seconds
+    TF_LOOKUP_TIMEOUT_DURATION = Duration(nanoseconds=200_000_000)  # 0.2s
+    TF_TRANSFORM_TIMEOUT_DURATION = Duration(nanoseconds=200_000_000)  # 0.2s
 
     def __init__(
         self,
@@ -79,7 +86,9 @@ class TransformationManager:
         }
 
         # Timer to keep TF tree alive in RViz
-        self._tf_timer = self.node.create_timer(0.1, self._tf_timer_callback)
+        self._tf_timer = self.node.create_timer(
+            self.TF_RESOLUTION_S, self._tf_timer_callback
+        )
 
     def update_markers(
         self,
@@ -125,7 +134,7 @@ class TransformationManager:
             )
             marker_poses_cam[marker_id] = pose_cam
 
-            self._publish_marker_tf(marker_id, pose_cam)
+            self.broadcast_marker_tf(marker_id, pose_cam)
 
             if (
                 marker_id == self.board_ref_marker_id
@@ -136,7 +145,7 @@ class TransformationManager:
 
         # Always try to publish board frame if we have the ref marker
         if self.board_ref_marker_id in marker_poses_cam:
-            self._publish_board_frame(
+            self.broadcast_tf_board(
                 marker_id=self.board_ref_marker_id,
                 stamp=stamp,
             )
@@ -152,7 +161,7 @@ class TransformationManager:
             tf_msg.header.stamp = now
             self.tf_broadcaster.sendTransform(tf_msg)
 
-    def _publish_marker_tf(self, marker_id: int, pose_cam: PoseStamped) -> None:
+    def broadcast_marker_tf(self, marker_id: int, pose_cam: PoseStamped) -> None:
         """
         Publish transform camera_frame -> aruco_<marker_id>.
         """
@@ -168,7 +177,7 @@ class TransformationManager:
         self.tf_broadcaster.sendTransform(tf_msg)
         self._cached_tf[tf_msg.child_frame_id] = tf_msg
 
-    def _publish_board_frame(self, marker_id: int, stamp: Time) -> None:
+    def broadcast_tf_board(self, marker_id: int, stamp: Time) -> None:
         """
         Publish transform aruco_<marker_id> -> board_frame, using fixed offsets.
         """
@@ -192,6 +201,59 @@ class TransformationManager:
         self.node.get_logger().debug(
             f"Published TF: aruco_{marker_id} -> {self.board_frame}"
         )
+
+    def lookup_transform(
+        self, target_frame: str, source_frame: str, time: Optional[Time] = None
+    ) -> Optional[TransformStamped]:
+        """
+        Lookup transform between frames.
+        Returns None if unavailable.
+        """
+        time = time or self.node.get_clock().now()
+
+        try:
+            tf_msg = self.tf_buffer.lookup_transform(
+                target_frame,
+                source_frame,
+                time,
+                timeout=self.TF_LOOKUP_TIMEOUT_DURATION,
+            )
+            return tf_msg
+
+        except Exception as e:
+            self.node.get_logger().warn(
+                f"[tf] Failed to lookup {target_frame} <- {source_frame}: {e}"
+            )
+            return None
+
+    def get_board_pose_in_base(
+        self, base_frame: str, board_frame: str, stamp: Time
+    ) -> Optional[PoseStamped]:
+        """
+        Returns the board pose expressed in base frame coordinates.
+
+        - Looks for transform: base_link <- board
+        - Returns PoseStamped or None if TF unavailable
+        """
+        tf_msg = self.lookup_transform(
+            target_frame=base_frame, source_frame=board_frame, time=stamp
+        )
+
+        if tf_msg is None:
+            # already logged in lookup_transform
+            return None
+
+        # Convert TransformStamped → PoseStamped
+        pose = PoseStamped()
+        pose.header = tf_msg.header
+        pose.header.frame_id = base_frame
+
+        pose.pose.position.x = tf_msg.transform.translation.x
+        pose.pose.position.y = tf_msg.transform.translation.y
+        pose.pose.position.z = tf_msg.transform.translation.z
+
+        pose.pose.orientation = tf_msg.transform.rotation
+        return pose
 
     @staticmethod
     def _build_camera_matrices(
@@ -362,7 +424,7 @@ class TransformationManager:
                 self.tf_buffer.transform(
                     depth_cam,
                     self.base_frame,
-                    timeout=Duration(nanoseconds=200_000_000),  # 0.2s
+                    timeout=self.TF_TRANSFORM_TIMEOUT_DURATION,
                 ),
             )
 

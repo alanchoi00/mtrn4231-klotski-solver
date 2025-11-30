@@ -13,6 +13,7 @@ class CameraManager:
     """
     Manages camera subscriptions and image processing.
     """
+
     def __init__(self, node: "Sense"):
         self.node = node
         self.cv_bridge = CvBridge()
@@ -20,11 +21,10 @@ class CameraManager:
         self.depth_image: Optional[np.ndarray] = None
         self.intrinsics: Optional[rs.intrinsics] = None  # rs.intrinsics
 
-
         # Subscribers for camera topics
-        self.image_sub_topic = '/camera/camera/image_raw'
-        self.point_cloud_sub_topic = '/camera/camera/aligned_depth_to_color/image_raw'
-        self.cam_info_sub_topic = '/camera/camera/aligned_depth_to_color/camera_info'
+        self.image_sub_topic = "/camera/camera/image_raw"
+        self.point_cloud_sub_topic = "/camera/camera/aligned_depth_to_color/image_raw"
+        self.cam_info_sub_topic = "/camera/camera/aligned_depth_to_color/camera_info"
         self.image_sub = self.node.create_subscription(
             Image, self.image_sub_topic, self.arm_image_callback, 10
         )
@@ -39,7 +39,7 @@ class CameraManager:
         self.cells_overlay_image_pub_topic = "/sense/cells_overlay"
         self.rectified_board_image_pub_topic = "/sense/rectified_board"
         self.cells_overlay_image_pub = self.node.create_publisher(
-            Image, self.cells_overlay_image_pub_topic   , 1
+            Image, self.cells_overlay_image_pub_topic, 1
         )
         self.rectified_board_image_pub = self.node.create_publisher(
             Image, self.rectified_board_image_pub_topic, 1
@@ -48,11 +48,21 @@ class CameraManager:
         self.cache_overlay_image: Optional[np.ndarray] = None
         self.cache_rectified_image: Optional[np.ndarray] = None
 
-        self.overlay_image_timer = self.node.create_timer(1.0, self.overlay_image_timer_callback)
-        self.rectified_image_timer = self.node.create_timer(1.0, self.rectified_image_timer_callback)
+        self.overlay_image_timer = self.node.create_timer(
+            1.0, self.overlay_image_timer_callback
+        )
+        self.rectified_image_timer = self.node.create_timer(
+            1.0, self.rectified_image_timer_callback
+        )
 
     def get_color_image(self) -> Optional[np.ndarray]:
         return self.cv_image
+
+    def get_depth_image(self) -> Optional[np.ndarray]:
+        return self.depth_image
+
+    def get_intrinsics(self) -> Optional[rs.intrinsics]:
+        return self.intrinsics
 
     def arm_image_depth_info_callback(self, cameraInfo: CameraInfo):
         if self.intrinsics:
@@ -65,9 +75,9 @@ class CameraManager:
             intr.ppy = cameraInfo.k[5]
             intr.fx = cameraInfo.k[0]
             intr.fy = cameraInfo.k[4]
-            if cameraInfo.distortion_model == 'plumb_bob':
+            if cameraInfo.distortion_model == "plumb_bob":
                 intr.model = rs.distortion.brown_conrady
-            elif cameraInfo.distortion_model == 'equidistant':
+            elif cameraInfo.distortion_model == "equidistant":
                 intr.model = rs.distortion.kannala_brandt4
             else:
                 intr.model = rs.distortion.none
@@ -103,7 +113,15 @@ class CameraManager:
         self.cache_rectified_image = image
 
     def overlay_image_timer_callback(self):
-        self.publish_overlay_image(self.cache_overlay_image) if self.cache_overlay_image is not None else None
+        (
+            self.publish_overlay_image(self.cache_overlay_image)
+            if self.cache_overlay_image is not None
+            else None
+        )
 
     def rectified_image_timer_callback(self):
-        self.publish_warped_image(self.cache_rectified_image) if self.cache_rectified_image is not None else None
+        (
+            self.publish_warped_image(self.cache_rectified_image)
+            if self.cache_rectified_image is not None
+            else None
+        )

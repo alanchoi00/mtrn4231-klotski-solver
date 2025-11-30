@@ -4,23 +4,36 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 
 from klotski_interfaces.msg import BoardState
 
-from ..managers import (BoardStateManager, CameraManager, HSVConfigManager,
-                        TransformationManager)
-from ..services import (annotate_cell_colors, build_masks,
-                        detect_aruco_markers, get_missing_target_ids,
-                        grid_to_board, render_annotated_grid_overlay_image,
-                        validate_board_configuration, warp_image_to_board)
+from ..managers import (
+    BoardStateManager,
+    CameraManager,
+    HSVConfigManager,
+    TransformationManager,
+)
+from ..services import (
+    annotate_cell_colors,
+    build_masks,
+    detect_aruco_markers,
+    get_missing_target_ids,
+    grid_to_board,
+    render_annotated_grid_overlay_image,
+    validate_board_configuration,
+    warp_image_to_board,
+)
 
 
 class CaptureBoardHandler:
     def __init__(
         self,
+        *,
         camera_manager: CameraManager,
         tf_manager: TransformationManager,
         board_state_manager: BoardStateManager,
         hsv_config_manager: HSVConfigManager,
         clock: Clock,
         logger: RcutilsLogger,
+        board_frame: str,
+        base_frame: str,
         board_tl_marker_id: int,
         board_tr_marker_id: int,
         board_bl_marker_id: int,
@@ -35,6 +48,8 @@ class CaptureBoardHandler:
         self.hsv_config_manager = hsv_config_manager
         self.clock = clock
         self.logger = logger
+        self.board_frame = board_frame
+        self.base_frame = base_frame
         self.board_tl_marker_id = board_tl_marker_id
         self.board_tr_marker_id = board_tr_marker_id
         self.board_bl_marker_id = board_bl_marker_id
@@ -114,17 +129,28 @@ class CaptureBoardHandler:
             response.ok = False
             response.note = f"Error converting grid to board message: {e}"
             return response
-        # board_pose_msg = self.tf_manager.get_board_pose()
 
-        state_msg = BoardState(
-            board=board_msg,
-            stamp=now,
-            # board_pose=board_pose_msg
+        self.tf_manager.update_markers(
+            aruco_info=aruco_infos,
+            depth_image=self.camera_manager.get_depth_image(),
+            intrinsics=self.camera_manager.get_intrinsics(),
+            stamp=self.clock.now(),
         )
+
+        board_pose_msg = self.tf_manager.get_board_pose_in_base(
+            board_frame=self.board_frame,
+            base_frame=self.base_frame,
+            stamp=self.clock.now(),
+        )
+
+        state_msg = BoardState(stamp=now, board=board_msg, board_pose=board_pose_msg)
 
         try:
             validate_board_configuration(
-                annotated_grid, board_msg, self.board_width_cells, self.board_height_cells
+                annotated_grid,
+                board_msg,
+                self.board_width_cells,
+                self.board_height_cells,
             )
         except Exception as e:
             response.ok = False

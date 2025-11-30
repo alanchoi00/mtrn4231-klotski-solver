@@ -1,13 +1,19 @@
 import rclpy
-from klotski_interfaces.srv._capture_board import (CaptureBoard,
-                                                   CaptureBoard_Request,
-                                                   CaptureBoard_Response)
+from klotski_interfaces.srv._capture_board import (
+    CaptureBoard,
+    CaptureBoard_Request,
+    CaptureBoard_Response,
+)
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from .handlers import CaptureBoardHandler
-from .managers import (BoardStateManager, CameraManager, HSVConfigManager,
-                       TransformationManager)
+from .managers import (
+    BoardStateManager,
+    CameraManager,
+    HSVConfigManager,
+    TransformationManager,
+)
 
 
 class Sense(Node):
@@ -200,24 +206,16 @@ class Sense(Node):
             .string_value
         )
         self.board_tl_marker_id = (
-            self.get_parameter("board_tl_marker_id")
-            .get_parameter_value()
-            .integer_value
+            self.get_parameter("board_tl_marker_id").get_parameter_value().integer_value
         )
         self.board_tr_marker_id = (
-            self.get_parameter("board_tr_marker_id")
-            .get_parameter_value()
-            .integer_value
+            self.get_parameter("board_tr_marker_id").get_parameter_value().integer_value
         )
         self.board_bl_marker_id = (
-            self.get_parameter("board_bl_marker_id")
-            .get_parameter_value()
-            .integer_value
+            self.get_parameter("board_bl_marker_id").get_parameter_value().integer_value
         )
         self.board_br_marker_id = (
-            self.get_parameter("board_br_marker_id")
-            .get_parameter_value()
-            .integer_value
+            self.get_parameter("board_br_marker_id").get_parameter_value().integer_value
         )
         self.marker_length_m = (
             self.get_parameter("marker_length_m").get_parameter_value().double_value
@@ -264,7 +262,16 @@ class Sense(Node):
         )
 
         self.camera = CameraManager(self)
-        self.transformation = TransformationManager(self)
+        self.transformation_manager = TransformationManager(
+            self,
+            base_frame="base_link",
+            camera_frame=self.camera_frame_id,
+            board_frame="klotski_board",
+            board_marker_length_m=self.marker_length_m,
+            board_ref_marker_id=self.board_bl_marker_id,
+            board_offset_x_m=self.board_offset_x_m,
+            board_offset_y_m=self.board_offset_y_m,
+        )
         self.board_state_manager = BoardStateManager(self)
         self.hsv_config_manager = HSVConfigManager(self, hsv_config_filename)
 
@@ -275,7 +282,7 @@ class Sense(Node):
         # Handlers
         self.capture_board_handler = CaptureBoardHandler(
             camera_manager=self.camera,
-            tf_manager=self.transformation,
+            tf_manager=self.transformation_manager,
             hsv_config_manager=self.hsv_config_manager,
             board_state_manager=self.board_state_manager,
             clock=self.get_clock(),
@@ -292,9 +299,7 @@ class Sense(Node):
         self.get_logger().info("sense ready: /sense/capture_board")
 
     def capture_board_callback(
-        self,
-        request: CaptureBoard_Request,
-        response: CaptureBoard_Response
+        self, request: CaptureBoard_Request, response: CaptureBoard_Response
     ) -> CaptureBoard_Response:
         self.get_logger().info("capture_board_callback called")
         return self.capture_board_handler.handle()
