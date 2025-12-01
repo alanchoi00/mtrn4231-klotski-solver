@@ -7,14 +7,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Grid3X3, Menu, Palette } from "lucide-react";
+import { Grid3X3, Hand, Menu, Palette } from "lucide-react";
 import { useState } from "react";
 import { ColourMaskerSheet } from "./ColourMasker/ColourMaskerSheet";
 import { GoalEditorSheet } from "./GoalEditor/GoalEditorSheet";
+import { HandDetectionViewer } from "./HandDetectionViewer";
 
 export const ToolsMenu: React.FC = () => {
   const [isColourMaskerOpen, setIsColourMaskerOpen] = useState(false);
   const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
+  const [isHandDetectionOpen, setIsHandDetectionOpen] = useState(false);
 
   return (
     <>
@@ -36,6 +38,10 @@ export const ToolsMenu: React.FC = () => {
             <Palette className="mr-2 h-4 w-4" />
             Colour Masker
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsHandDetectionOpen(true)}>
+            <Hand className="mr-2 h-4 w-4" />
+            Hand Detection
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -47,6 +53,11 @@ export const ToolsMenu: React.FC = () => {
       <ColourMaskerSheet
         open={isColourMaskerOpen}
         onOpenChange={setIsColourMaskerOpen}
+      />
+
+      <HandDetectionViewer
+        open={isHandDetectionOpen}
+        onClose={() => setIsHandDetectionOpen(false)}
       />
     </>
   );

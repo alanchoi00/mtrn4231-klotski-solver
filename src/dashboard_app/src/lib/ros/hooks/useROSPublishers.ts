@@ -1,4 +1,5 @@
 "use client";
+import { MESSAGE_TYPES, TOPICS } from "@/lib/constants";
 import { BoardMsg, UICommandMsg, UIMode } from "@/lib/ros/types";
 import { useCallback } from "react";
 import ROSLIB, { type Ros } from "roslib";
@@ -20,8 +21,8 @@ export const useROSPublishers = (ros?: Ros, showToasts = true) => {
       try {
         const pub = new ROSLIB.Topic({
           ros,
-          name: "/ui/cmd",
-          messageType: "klotski_interfaces/msg/UICommand",
+          name: TOPICS.UI_COMMAND,
+          messageType: MESSAGE_TYPES.UI_COMMAND,
         });
 
         const msg: UICommandMsg = { mode };
@@ -55,8 +56,8 @@ export const useROSPublishers = (ros?: Ros, showToasts = true) => {
       try {
         const pub = new ROSLIB.Topic({
           ros,
-          name: "/ui/goal",
-          messageType: "klotski_interfaces/msg/Board",
+          name: TOPICS.UI_GOAL,
+          messageType: MESSAGE_TYPES.BOARD,
         });
 
         pub.publish(new ROSLIB.Message(goal));

@@ -6,8 +6,6 @@ import pyrealsense2 as rs
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo, Image
 
-from ..services.colour_mask import build_colour_masks
-
 if TYPE_CHECKING:
     from ..sense_node import Sense
     from .hsv_config_manager import HSVConfig
@@ -160,6 +158,9 @@ class CameraManager:
         self, img: np.ndarray, hsv_config: "HSVConfig"
     ) -> np.ndarray:
         """Create a combined masked image showing all color detections."""
+        # Import here to avoid circular dependency
+        from ..services.colour_mask import build_colour_masks
+
         masks = build_colour_masks(img, hsv_config)
 
         # Create colored overlay image

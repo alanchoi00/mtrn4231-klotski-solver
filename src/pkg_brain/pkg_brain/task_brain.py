@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Bool
 
 from klotski_interfaces.msg import BoardState
 
 from .context import BrainContext
-from .managers import (ActionExecutor, PipelineOrchestrator, ServiceManager,
-                       UIManager)
+from .managers import ActionExecutor, PipelineOrchestrator, ServiceManager, UIManager
+from .ui_modes import UIMode
 
 
 class TaskBrain(Node):
@@ -36,6 +37,11 @@ class TaskBrain(Node):
         # Set up board state subscription
         self.create_subscription(BoardState, "/board_state", self.on_board_state, 10)
 
+        # Set up safety stop subscription
+        self._safety_stop_active = False
+        self._mode_before_safety_stop: int | None = None
+        self.create_subscription(Bool, "/safety/stop", self.on_safety_stop, 10)
+
         self.ui_manager.ui("TaskBrain up. Modes: auto | step | pause | reset")
 
     def on_board_state(self, state: BoardState) -> None:
@@ -45,6 +51,26 @@ class TaskBrain(Node):
         # sensing updated -> invalidate plan to trigger replanning
         self.ctx.plan_received = False
         self.tick("board_state")
+
+    def on_safety_stop(self, msg: Bool) -> None:
+        """Handle safety stop signals from hand detection."""
+        stop_active = msg.data
+
+        if stop_active and not self._safety_stop_active:
+            # Safety stop triggered - save current mode and pause
+            self._safety_stop_active = True
+            if self.ctx.mode != UIMode.PAUSE:
+                self._mode_before_safety_stop = self.ctx.mode
+                self.ctx.mode = UIMode.PAUSE
+                self.ui_manager.ui("⚠️ SAFETY STOP: Hand detected - pausing operations")
+        elif not stop_active and self._safety_stop_active:
+            # Safety stop cleared - restore previous mode (no auto-resume)
+            self._safety_stop_active = False
+            if self._mode_before_safety_stop is not None:
+                self.ctx.mode = self._mode_before_safety_stop
+                mode_name = UIMode.to_string(self._mode_before_safety_stop)
+                self.ui_manager.ui(f"✅ SAFETY CLEAR: Mode restored to {mode_name}")
+                self._mode_before_safety_stop = None
 
     def tick(self, source: str) -> None:
         """Delegate to pipeline orchestrator."""

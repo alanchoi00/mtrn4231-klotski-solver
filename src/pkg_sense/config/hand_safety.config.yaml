@@ -1,0 +1,28 @@
+hand_safety_monitor:
+  ros__parameters:
+    # Detection confidence thresholds
+    min_detection_confidence: 0.5
+    min_tracking_confidence: 0.5
+
+    # Safety logic
+    clear_after_frames: 10
+
+    # ROI (Region of Interest) - polygon defined by 4 points
+    # Coordinates are normalized (0.0 to 1.0) relative to image size
+    # Points should be specified in clockwise or counter-clockwise order
+    enable_roi: true
+    # Point 1 (top-left)
+    roi_p1_x: 0.1
+    roi_p1_y: 0.1
+    # Point 2 (top-right)
+    roi_p2_x: 0.9
+    roi_p2_y: 0.1
+    # Point 3 (bottom-right)
+    roi_p3_x: 0.9
+    roi_p3_y: 0.9
+    # Point 4 (bottom-left)
+    roi_p4_x: 0.1
+    roi_p4_y: 0.9
+
+    # Timer period (seconds) - ~30 Hz
+    timer_period_sec: 0.033

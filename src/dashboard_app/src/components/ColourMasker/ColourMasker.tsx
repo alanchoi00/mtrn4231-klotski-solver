@@ -9,6 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { TOPICS, WEB_VIDEO_SERVER_PORT } from "@/lib/constants";
 import { useHSVConfig } from "@/lib/ros/hooks/useHSVConfig";
 import { useROS } from "@/lib/ros";
 import type { HSVRangeMsg, HSVRangesMsg } from "@/lib/ros/types";
@@ -133,7 +134,7 @@ export const ColourMasker: React.FC = () => {
   }, [exportHSVRangesYaml]);
 
   const maskedImageUrl = connected
-    ? `http://${window.location.hostname}:8080/stream?topic=/sense/masked_image`
+    ? `http://${window.location.hostname}:${WEB_VIDEO_SERVER_PORT}/stream?topic=${TOPICS.MASKED_IMAGE}`
     : "";
 
   return (
