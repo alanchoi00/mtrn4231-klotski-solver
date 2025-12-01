@@ -6,6 +6,8 @@ import pyrealsense2 as rs
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo, Image
 
+from ..services.colour_mask import build_colour_masks
+
 if TYPE_CHECKING:
     from ..sense_node import Sense
     from .hsv_config_manager import HSVConfig
@@ -158,33 +160,16 @@ class CameraManager:
         self, img: np.ndarray, hsv_config: "HSVConfig"
     ) -> np.ndarray:
         """Create a combined masked image showing all color detections."""
-        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-        # Build individual masks
-        def mask(range_name: str) -> np.ndarray:
-            r = hsv_config.ranges.get(range_name)
-            if r is None:
-                return np.zeros(hsv_img.shape[:2], dtype=np.uint8)
-            return cv2.inRange(hsv_img, r.low, r.high)
-
-        # Combine masks for each color
-        red_mask = mask("red1") | mask("red2")
-        yellow_mask = mask("yellow")
-        green_mask = mask("green")
-        blue_mask = mask("blue")
+        masks = build_colour_masks(img, hsv_config)
 
         # Create colored overlay image
         result = img.copy()
 
-        # Apply colored overlays for each detected color
-        # Red overlay
-        result[red_mask > 0] = [0, 0, 255]
-        # Yellow overlay
-        result[yellow_mask > 0] = [0, 255, 255]
-        # Green overlay
-        result[green_mask > 0] = [0, 255, 0]
-        # Blue overlay
-        result[blue_mask > 0] = [255, 0, 0]
+        # Apply colored overlays for each detected color (BGR format)
+        result[masks["red"] > 0] = [0, 0, 255]
+        result[masks["yellow"] > 0] = [0, 255, 255]
+        result[masks["green"] > 0] = [0, 255, 0]
+        result[masks["blue"] > 0] = [255, 0, 0]
 
         # Blend with original for semi-transparent effect
         alpha = 0.6
