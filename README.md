@@ -10,10 +10,49 @@ This Klotski solver is designed to support players who want to deepen their unde
 
 In summmary this project implements an automated Klotski puzzle solver that:
 
-- **Senses**: Uses computer vision to detect the current puzzle state
+- **Senses**: Uses computer vision to detect the current puzzle state as well as the board position
 - **Plans**: Generates optimal move sequences to reach the goal configuration
-- **Acts**: Controls a robotic arm to physically manipulate puzzle pieces
+- **Acts**: Controls a robotic arm to physically manipulate puzzle pieces on the board
 - **Monitors**: Provides a web-based dashboard for real-time control and visualization
+
+## System Architecture
+
+TODO
+
+## Technical Compenents
+
+### Computer Vision
+The vision pipeline consists of four major stages:
+
+1. **Aruco Detection**
+   - Aruco markers placed at the four corners of the board are identified and matched to known corner IDs.
+   - Their pixel positions are stored for later use in frame-to-frame transformations.
+
+2. **Board Isolation**
+   - The detected Aruco marker positions are used to compute a homography matrix.
+   - This matrix is then applied to warp the camera view and isolate a rectified top-down view of the board.
+
+3. **Grid Colour Detection**
+   - A 4×5 grid (matching the Klotski board dimensions) is overlaid on the rectified board image.
+   - Colour masks are applied to determine the colour of each grid cell.
+
+4. **Reconstructing the Board State from Grid Colours**
+   - The grid-colour map is converted back into piece positions.
+   - In Klotski, this mapping is **injective**, meaning each valid grid-colour configuration corresponds to a unique arrangement of pieces.
+   - Therefore, once a set of grid colours is known, the corresponding board state is uniquely determined.
+   - A sliding-window detection algorithm is used to identify connected shapes and assemble the complete piece-position map.
+
+MUST INCLUDE
+photo of the board on the table
+photo of the grid colour image
+
+### End Effector
+The custom end effector is parrallel gripper driven by a single servo motor. It consits of primarily laser-cut acrylic sheet and plywood, with a few 
+
+### Visualisation
+
+### Closed-Loop Operation
+
 
 ## 🚀 Quick Start
 
