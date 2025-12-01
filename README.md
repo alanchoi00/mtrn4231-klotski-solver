@@ -47,7 +47,7 @@ photo of the board on the table
 photo of the grid colour image
 
 ### End Effector
-The custom end effector is parrallel gripper driven by a single servo motor. It consits of primarily laser-cut acrylic sheet and plywood, with a few 
+The custom end effector is parallel gripper driven by a single servo motor. It consits of primarily laser-cut acrylic sheet and plywood. Its design is both simple and functional.
 
 ### Visualisation
 
