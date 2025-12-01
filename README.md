@@ -49,10 +49,16 @@ photo of the grid colour image
 ### End Effector
 The custom end effector is parallel gripper driven by a single servo motor. It consits of primarily laser-cut acrylic sheet and plywood. Its design is both simple and functional.
 
+<img src="Images/Assembly_2.png" alt="Gripper assembly render" width="300">
+
+#### Assembly Guide
+The majority of the end effector is held toghether with metric bolts and nuts. 
+
 ### Visualisation
 
 ### Closed-Loop Operation
-
+```mermaid
+```
 
 ## 🚀 Quick Start
 
