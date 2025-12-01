@@ -11,17 +11,23 @@ class ArucoInfo:
     center: np.ndarray
     corners: np.ndarray
 
+
 @dataclass
 class ArucoInfoList:
     infos: List[ArucoInfo]
 
-    def sort_by_target_id(self) -> 'ArucoInfoList':
+    def sort_by_target_id(self) -> "ArucoInfoList":
         # validate all target IDs are present
         for target_id in TARGET_IDS:
             if not any(info.id == target_id for info in self.infos):
-                raise RuntimeError(f"Missing ArUco id {target_id}. Found {[info.id for info in self.infos]}")
+                raise RuntimeError(
+                    f"Missing ArUco id {target_id}. Found {[info.id for info in self.infos]}"
+                )
 
-        sorted_infos = [next(info for info in self.infos if info.id == target_id) for target_id in TARGET_IDS]
+        sorted_infos = [
+            next(info for info in self.infos if info.id == target_id)
+            for target_id in TARGET_IDS
+        ]
         return ArucoInfoList(infos=sorted_infos)
 
     def __iter__(self):
@@ -43,12 +49,13 @@ class ArucoInfoList:
 @dataclass(frozen=True)
 class DetectionConfig:
     """Overrides for cv2.aruco.DetectorParameters."""
+
     params: Dict[str, float]
 
 
 @dataclass
 class DetectionResult:
-    ids: Optional[np.ndarray]          # shape (N,) or None
+    ids: Optional[np.ndarray]  # shape (N,) or None
     corners_list: Optional[Sequence[np.ndarray]]  # list of (4,2) arrays
 
 
@@ -60,7 +67,9 @@ DETECTION_CONFIGS: List[DetectionConfig] = [
     DetectionConfig(params={"adaptiveThreshConstant": 5}),
     DetectionConfig(params={"adaptiveThreshConstant": 10}),
     DetectionConfig(params={"minMarkerPerimeterRate": 0.02}),
-    DetectionConfig(params={"minMarkerPerimeterRate": 0.02, "adaptiveThreshConstant": 10}),
+    DetectionConfig(
+        params={"minMarkerPerimeterRate": 0.02, "adaptiveThreshConstant": 10}
+    ),
 ]
 
 
@@ -152,8 +161,10 @@ def detect_aruco_markers(image_bgr: np.ndarray) -> ArucoInfoList:
     best_result = pick_best_detection(gray, dictionary)
     return build_aruco_info_list(best_result)
 
+
 def get_aruco_ids(aruco_infos: ArucoInfoList) -> List[int]:
     return [info.id for info in aruco_infos]
+
 
 def get_missing_target_ids(aruco_infos: ArucoInfoList) -> List[int]:
     ids = set(get_aruco_ids(aruco_infos))

@@ -77,14 +77,14 @@ class CaptureBoardHandler:
 
         try:
             self.logger.info("Starting board capture pipeline...")
-            
+
             # Ensure base TF tree is available before proceeding
             if not self.tf.wait_for_base_tf(timeout_sec=5.0):
                 raise RuntimeError(
                     f"Base TF tree not available ({self.base_frame} <- camera). "
                     "Ensure the static transform publisher is running."
                 )
-            
+
             image = self._step_acquire_image()
             self.logger.info("Acquired image from camera")
             aruco_infos = self._step_detect_markers(image)

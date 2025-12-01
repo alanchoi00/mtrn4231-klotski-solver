@@ -5,10 +5,12 @@ from klotski_interfaces.msg import BoardState
 if TYPE_CHECKING:
     from ..sense_node import Sense
 
+
 class BoardStateManager:
     """
     Manages board state publishing.
     """
+
     def __init__(self, node: "Sense"):
         self.node = node
         self.state_pub = self.node.create_publisher(BoardState, "/board_state", 10)

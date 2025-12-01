@@ -11,7 +11,7 @@ from sensor_msgs.msg import Image
 
 class MockCameraPublisher(Node):
     def __init__(self):
-        super().__init__('mock_camera_publisher')
+        super().__init__("mock_camera_publisher")
 
         # publish to the topic your Sense node expects:
         topic = "/camera/camera/image_raw"
@@ -37,12 +37,14 @@ class MockCameraPublisher(Node):
         msg.header.frame_id = "camera_color_optical_frame"
         self.publisher.publish(msg)
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = MockCameraPublisher()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

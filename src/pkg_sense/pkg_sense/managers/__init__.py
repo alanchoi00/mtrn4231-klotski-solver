@@ -8,5 +8,5 @@ __all__ = [
     "CameraInfo",
     "TransformationManager",
     "HSVConfigManager",
-    "BoardStateManager"
+    "BoardStateManager",
 ]

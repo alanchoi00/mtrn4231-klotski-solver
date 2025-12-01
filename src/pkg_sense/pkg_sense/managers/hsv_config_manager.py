@@ -29,7 +29,7 @@ class HSVBounds:
 @dataclass
 class HSVRange:
     name: str
-    low: np.ndarray   # shape (3,), dtype uint8
+    low: np.ndarray  # shape (3,), dtype uint8
     high: np.ndarray  # shape (3,), dtype uint8
 
 
@@ -37,9 +37,8 @@ class HSVRange:
 class HSVConfig:
     ranges: Dict[str, HSVRange]
 
-
     @staticmethod
-    def load_hsv_config(config_path: str | Path) -> 'HSVConfig':
+    def load_hsv_config(config_path: str | Path) -> "HSVConfig":
         path = Path(config_path)
         with path.open("r") as f:
             raw: Dict[str, Dict[str, int]] = yaml.safe_load(f)
@@ -58,12 +57,13 @@ class HSVConfigManager:
     """
     Manages HSV configuration loading and access.
     """
+
     def __init__(self, node: "Sense", config_path: str | Path):
         self.node = node
 
         # Load default HSV config
-        pkg_share = get_package_share_directory('pkg_sense')
-        default_hsv_config_file = os.path.join(pkg_share, 'config', config_path)
+        pkg_share = get_package_share_directory("pkg_sense")
+        default_hsv_config_file = os.path.join(pkg_share, "config", config_path)
         self._hsv_config = HSVConfig.load_hsv_config(default_hsv_config_file)
         # TODO: add hsv config service client initialization here
 
