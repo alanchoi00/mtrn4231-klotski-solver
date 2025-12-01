@@ -1,4 +1,6 @@
-klotski_interfaces/HSVRanges ranges
+# Request to update HSV ranges (runtime only)
+klotski_interfaces/HSVRanges ranges   # HSV ranges to set
 ---
+# Response after setting HSV ranges
 bool ok
 string message
