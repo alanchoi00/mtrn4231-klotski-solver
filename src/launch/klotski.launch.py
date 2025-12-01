@@ -41,6 +41,7 @@ def generate_launch_description():
     # Launch configurations
     sim = LaunchConfiguration("sim")
     start_rosbridge = LaunchConfiguration("start_rosbridge")
+    web_video_server = LaunchConfiguration("web_video_server")
     robot_ip = LaunchConfiguration("robot_ip")
 
     # Klotski component launches
@@ -83,6 +84,11 @@ def generate_launch_description():
                 description="Whether to start rosbridge websocket",
             ),
             DeclareLaunchArgument(
+                "web_video_server",
+                default_value="true",
+                description="Whether to start web video server",
+            ),
+            DeclareLaunchArgument(
                 "robot_ip",
                 default_value="",
                 description="IP address of the real UR5e robot (required when sim:=false)",
@@ -96,6 +102,14 @@ def generate_launch_description():
                 name="rosbridge_websocket",
                 output="screen",
                 condition=IfCondition(start_rosbridge),
+            ),
+            # Web Video Server (optional)
+            Node(
+                package="web_video_server",
+                executable="web_video_server",
+                name="web_video_server",
+                output="screen",
+                condition=IfCondition(web_video_server),
             ),
             # STEP 1: Start UR5e Robot Driver FIRST
             # UR5e Robot Driver - Simulation
