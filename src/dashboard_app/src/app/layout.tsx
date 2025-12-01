@@ -40,7 +40,7 @@ export default function RootLayout({
         >
           {children}
         </body>
-        <Toaster richColors closeButton />
+        <Toaster richColors closeButton position="top-center" />
       </ROSProvider>
     </html>
   );
