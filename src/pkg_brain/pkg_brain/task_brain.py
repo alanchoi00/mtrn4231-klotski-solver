@@ -6,7 +6,7 @@ from std_msgs.msg import Bool
 
 from klotski_interfaces.msg import BoardState
 
-from .context import BrainContext
+from .context import BrainContext, ExecutionPhase
 from .managers import ActionExecutor, PipelineOrchestrator, ServiceManager, UIManager
 from .ui_modes import UIMode
 
@@ -40,6 +40,7 @@ class TaskBrain(Node):
         # Set up safety stop subscription
         self._safety_stop_active = False
         self._mode_before_safety_stop: int | None = None
+        self._phase_before_safety_stop: ExecutionPhase | None = None
         self.create_subscription(Bool, "/safety/stop", self.on_safety_stop, 10)
 
         self.ui_manager.ui("TaskBrain up. Modes: auto | step | pause | reset")
@@ -57,20 +58,38 @@ class TaskBrain(Node):
         stop_active = msg.data
 
         if stop_active and not self._safety_stop_active:
-            # Safety stop triggered - save current mode and pause
+            # Safety stop triggered - save current mode/phase and pause
             self._safety_stop_active = True
+            self._phase_before_safety_stop = self.ctx.current_phase
             if self.ctx.mode != UIMode.PAUSE:
                 self._mode_before_safety_stop = self.ctx.mode
                 self.ctx.mode = UIMode.PAUSE
                 self.ui_manager.ui("⚠️ SAFETY STOP: Hand detected - pausing operations")
         elif not stop_active and self._safety_stop_active:
-            # Safety stop cleared - restore previous mode (no auto-resume)
+            # Safety stop cleared
             self._safety_stop_active = False
+
+            # Determine which phase to resume at
+            prev_phase = self._phase_before_safety_stop
+            if prev_phase is None:
+                # Was None before, stay at None (no phase change)
+                pass
+            elif prev_phase == ExecutionPhase.RETREAT:
+                # Already at retreat, no need to change
+                pass
+            else:
+                # Was mid-operation, go to retreat phase for safety
+                self.ctx.current_phase = ExecutionPhase.RETREAT
+                self.ui_manager.ui("🔄 Resuming at RETREAT phase for safety")
+
+            # Restore previous mode
             if self._mode_before_safety_stop is not None:
                 self.ctx.mode = self._mode_before_safety_stop
                 mode_name = UIMode.to_string(self._mode_before_safety_stop)
                 self.ui_manager.ui(f"✅ SAFETY CLEAR: Mode restored to {mode_name}")
                 self._mode_before_safety_stop = None
+
+            self._phase_before_safety_stop = None
 
     def tick(self, source: str) -> None:
         """Delegate to pipeline orchestrator."""
