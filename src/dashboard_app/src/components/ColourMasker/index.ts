@@ -1,4 +1,5 @@
 export { ColourMasker } from "./ColourMasker";
+export { ColourMaskerSheet } from "./ColourMaskerSheet";
 export { ControlButtons } from "./ControlButtons";
 export { HSVSliderGroup } from "./HSVSliderGroup";
 export { MaskedImagePreview } from "./MaskedImagePreview";

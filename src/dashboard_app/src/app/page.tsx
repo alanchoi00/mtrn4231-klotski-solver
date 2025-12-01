@@ -1,17 +1,15 @@
-import { ColourMasker } from "@/components/ColourMasker";
 import { ControlPanel } from "@/components/ControlPanel";
-import { GoalEditor } from "@/components/GoalEditor";
+import { ToolsMenu } from "@/components/ToolsMenu";
 
 export default function Home() {
   return (
     <main
       className={`
-        flex min-h-screen items-center justify-center gap-2 bg-background p-4
+        flex min-h-screen items-center justify-center bg-background p-4
       `}
     >
-      <GoalEditor />
       <ControlPanel />
-      <ColourMasker />
+      <ToolsMenu />
     </main>
   );
 }
