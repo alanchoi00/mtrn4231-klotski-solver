@@ -2,11 +2,28 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
-                            TimerAction)
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    TimerAction,
+)
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+
+
+def validate_launch_args(context, *args, **kwargs):
+    sim_value = context.launch_configurations.get("sim", "false").lower()
+    robot_ip_value = context.launch_configurations.get("robot_ip", "")
+
+    if sim_value == "false" and not robot_ip_value:
+        raise RuntimeError(
+            "robot_ip launch argument is required when sim:=false. "
+            "Please provide the IP address of your UR5e robot. "
+            "Usage: ros2 launch klotski.launch.py sim:=false robot_ip:=192.168.1.100"
+        )
+
+    return []
 
 
 def generate_launch_description():
@@ -21,85 +38,84 @@ def generate_launch_description():
     ```
     """
     # Launch configurations
-    start_rosbridge = LaunchConfiguration('start_rosbridge')
-    sim = LaunchConfiguration('sim')
+    start_rosbridge = LaunchConfiguration("start_rosbridge")
+    sim = LaunchConfiguration("sim")
 
     # Klotski component launches
-    manip_launch = PathJoinSubstitution([
-        FindPackageShare('pkg_manipulation'), 'launch', 'manipulation.launch.py'
-    ])
+    manip_launch = PathJoinSubstitution(
+        [FindPackageShare("pkg_manipulation"), "launch", "manipulation.launch.py"]
+    )
 
-    plan_launch = PathJoinSubstitution([
-        FindPackageShare('pkg_plan'), 'launch', 'plan.launch.py'
-    ])
+    plan_launch = PathJoinSubstitution(
+        [FindPackageShare("pkg_plan"), "launch", "plan.launch.py"]
+    )
 
-    brain_launch = PathJoinSubstitution([
-        FindPackageShare('pkg_brain'), 'launch', 'brain.launch.py'
-    ])
+    brain_launch = PathJoinSubstitution(
+        [FindPackageShare("pkg_brain"), "launch", "brain.launch.py"]
+    )
 
-    sense_launch = PathJoinSubstitution([
-        FindPackageShare('pkg_sense'), 'launch', 'sense.launch.py'
-    ])
+    sense_launch = PathJoinSubstitution(
+        [FindPackageShare("pkg_sense"), "launch", "sense.launch.py"]
+    )
 
-    ur_moveit_launch = PathJoinSubstitution([
-        FindPackageShare('ur_moveit_config'), 'launch', 'ur_moveit.launch.py'
-    ])
+    ur_moveit_launch = PathJoinSubstitution(
+        [FindPackageShare("ur_moveit_config"), "launch", "ur_moveit.launch.py"]
+    )
 
-    return LaunchDescription([
-        # Launch arguments
-        DeclareLaunchArgument(
-            'sim',
-            default_value='false',
-            description='Use simulation (fake hardware) if true, real robot if false'
-        ),
-        DeclareLaunchArgument(
-            'start_rosbridge',
-            default_value='true',
-            description='Whether to start rosbridge websocket'
-        ),
-
-        Node(
-            package='rosbridge_server',
-            executable='rosbridge_websocket',
-            name='rosbridge_websocket',
-            output='screen',
-            condition=IfCondition(start_rosbridge),
-        ),
-        TimerAction(
-            period=3.0,
-            actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(ur_moveit_launch),
-                    launch_arguments={
-                        'ur_type': 'ur5e',
-                        'use_fake_hardware': LaunchConfiguration('sim'),
-                        'launch_rviz': 'true',
-                        'description_package' : 'ur_with_gripper_description', 
-                        'description_file' : 'ur_with_gripper.xacro',
-                    }.items(),
-                ),
-            ]
-        ),
-        TimerAction(
-            period=3.0,  # Wait 3 seconds for MoveIt to be ready
-            actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(manip_launch),
-                ),
-
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(plan_launch),
-                ),
-
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(sense_launch),
-                    condition=UnlessCondition(sim),  # Only start sensing in real robot mode
-                ),
-
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(brain_launch),
-                ),
-            ],
-        ),
-    ])
-
+    return LaunchDescription(
+        [
+            # Launch arguments
+            DeclareLaunchArgument(
+                "sim",
+                default_value="false",
+                description="Use simulation (fake hardware) if true, real robot if false",
+            ),
+            DeclareLaunchArgument(
+                "start_rosbridge",
+                default_value="true",
+                description="Whether to start rosbridge websocket",
+            ),
+            Node(
+                package="rosbridge_server",
+                executable="rosbridge_websocket",
+                name="rosbridge_websocket",
+                output="screen",
+                condition=IfCondition(start_rosbridge),
+            ),
+            TimerAction(
+                period=3.0,
+                actions=[
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(ur_moveit_launch),
+                        launch_arguments={
+                            "ur_type": "ur5e",
+                            "use_fake_hardware": LaunchConfiguration("sim"),
+                            "launch_rviz": "true",
+                            "description_package": "ur_with_gripper_description",
+                            "description_file": "ur_with_gripper.xacro",
+                        }.items(),
+                    ),
+                ],
+            ),
+            TimerAction(
+                period=3.0,  # Wait 3 seconds for MoveIt to be ready
+                actions=[
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(manip_launch),
+                    ),
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(plan_launch),
+                    ),
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(sense_launch),
+                        condition=UnlessCondition(
+                            sim
+                        ),  # Only start sensing in real robot mode
+                    ),
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(brain_launch),
+                    ),
+                ],
+            ),
+        ]
+    )

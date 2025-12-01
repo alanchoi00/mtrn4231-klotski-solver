@@ -1,0 +1,36 @@
+red1:
+  h_min: 0
+  h_max: 10
+  s_min: 100
+  s_max: 255
+  v_min: 80
+  v_max: 255
+red2:
+  h_min: 170
+  h_max: 180
+  s_min: 100
+  s_max: 255
+  v_min: 80
+  v_max: 255
+yellow:
+  h_min: 25
+  h_max: 60
+  s_min: 10
+  s_max: 255
+  v_min: 70
+  v_max: 255
+green:
+  h_min: 30
+  h_max: 94
+  s_min: 100
+  s_max: 255
+  v_min: 60
+  v_max: 255
+blue:
+  h_min: 95
+  h_max: 130
+  s_min: 165
+  s_max: 255
+  v_min: 0
+  v_max: 255
+

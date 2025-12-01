@@ -15,21 +15,12 @@
     "cSpell.advanced.feature.useReferenceProviderRemove": "/^#+\\s/"
   },
   "[python]": {
-    "diffEditor.ignoreTrimWhitespace": false,
-    "editor.defaultColorDecorators": "never",
-    "gitlens.codeLens.symbolScopes": [
-      "!Module"
-    ],
-    "editor.formatOnType": true,
     "editor.wordBasedSuggestions": "off",
     "editor.tabSize": 4,
-    "files.saveConflictResolution": "overwriteFileOnDisk"
+    "files.saveConflictResolution": "overwriteFileOnDisk",
+    "editor.defaultFormatter": "ms-python.black-formatter"
   },
   "python.analysis.typeCheckingMode": "basic",
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit",
-    "source.organizeImports": "explicit"
-  },
   "editor.formatOnSave": true,
   "editor.tabSize": 2,
   "editor.trimAutoWhitespace": true,
