@@ -1,3 +1,4 @@
+import { ColourMasker } from "@/components/ColourMasker";
 import { ControlPanel } from "@/components/ControlPanel";
 import { GoalEditor } from "@/components/GoalEditor";
 
@@ -10,6 +11,7 @@ export default function Home() {
     >
       <GoalEditor />
       <ControlPanel />
+      <ColourMasker />
     </main>
   );
 }

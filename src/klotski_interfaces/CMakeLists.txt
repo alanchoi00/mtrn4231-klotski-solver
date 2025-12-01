@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetHSVRanges.srv"
   "srv/SetHSVRanges.srv"
   "srv/ExportHSVRangesYaml.srv"
+  "srv/ResetHSVRanges.srv"
   "action/GripPiece.action"
   DEPENDENCIES geometry_msgs builtin_interfaces
 )

@@ -122,9 +122,9 @@ def generate_launch_description():
                 condition=UnlessCondition(sim),
             ),
             # STEP 2: Start MoveIt after robot driver is ready
-            # MoveIt Configuration - 10 second delay to ensure robot driver is ready
+            # MoveIt Configuration - 3 second delay to ensure robot driver is ready
             TimerAction(
-                period=10.0,
+                period=3.0,
                 actions=[
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(ur_moveit_launch),
@@ -140,7 +140,7 @@ def generate_launch_description():
             ),
             # STEP 3: Start Klotski Components after MoveIt is ready
             TimerAction(
-                period=15.0,  # Wait 15 seconds for MoveIt to be ready
+                period=3.0,  # Wait 3 seconds for MoveIt to be ready
                 actions=[
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(manip_launch),
@@ -153,9 +153,6 @@ def generate_launch_description():
                     ),
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(brain_launch),
-                    ),
-                    IncludeLaunchDescription(
-                        PythonLaunchDescriptionSource(sense_launch),
                     ),
                 ],
             ),

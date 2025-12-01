@@ -15,7 +15,12 @@ from typing import Dict
 import numpy as np
 import yaml
 
-from klotski_interfaces.srv import GetHSVRanges, SetHSVRanges, ExportHSVRangesYaml
+from klotski_interfaces.srv import (
+    GetHSVRanges,
+    SetHSVRanges,
+    ExportHSVRangesYaml,
+    ResetHSVRanges,
+)
 from klotski_interfaces.msg import HSVRange as HSVRangeMsg, HSVRanges as HSVRangesMsg
 
 
@@ -95,9 +100,15 @@ class HSVConfigManager:
             "/sense/export_hsv_ranges_yaml",
             self._export_hsv_ranges_yaml_callback,
         )
+        self._reset_hsv_srv = node.create_service(
+            ResetHSVRanges,
+            "/sense/reset_hsv_ranges",
+            self._reset_hsv_ranges_callback,
+        )
         node.get_logger().info(
             "HSV config services ready: /sense/get_hsv_ranges, "
-            "/sense/set_hsv_ranges, /sense/export_hsv_ranges_yaml"
+            "/sense/set_hsv_ranges, /sense/export_hsv_ranges_yaml, "
+            "/sense/reset_hsv_ranges"
         )
         node.get_logger().info("HSV ranges publisher ready: /sense/hsv_ranges")
 
@@ -144,9 +155,10 @@ class HSVConfigManager:
         return yaml.safe_dump(yaml_data, default_flow_style=False, sort_keys=False)
 
     def reload_from_yaml(self, file_path: str | Path | None = None) -> None:
-        """Reload HSV config from YAML file."""
+        """Reload HSV config from YAML file and publish the update."""
         path = file_path if file_path else self._installed_config_path
         self._hsv_config = HSVConfig.load_hsv_config(path)
+        self.publish_hsv_ranges()
         self.node.get_logger().info(f"HSV config reloaded from: {path}")
 
     def _hsv_range_to_msg(self, hsv_range: HSVRange) -> HSVRangeMsg:
@@ -231,6 +243,30 @@ class HSVConfigManager:
             response.ok = False
             response.yaml_content = ""
             response.message = f"Failed to export HSV ranges: {e}"
+            self.node.get_logger().error(response.message)
+
+        return response
+
+    def _reset_hsv_ranges_callback(
+        self,
+        request: ResetHSVRanges.Request,
+        response: ResetHSVRanges.Response,
+    ) -> ResetHSVRanges.Response:
+        """Service callback to reset HSV ranges to values from YAML config file."""
+        try:
+            self.reload_from_yaml()
+            ranges_msg = HSVRangesMsg()
+            ranges_msg.ranges = [
+                self._hsv_range_to_msg(hsv_range)
+                for hsv_range in self._hsv_config.ranges.values()
+            ]
+            response.ranges = ranges_msg
+            response.ok = True
+            response.message = "HSV ranges reset to YAML config values"
+            self.node.get_logger().info(response.message)
+        except Exception as e:
+            response.ok = False
+            response.message = f"Failed to reset HSV ranges: {e}"
             self.node.get_logger().error(response.message)
 
         return response

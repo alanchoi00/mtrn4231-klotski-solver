@@ -138,8 +138,12 @@ class Sense(Node):
 
         hsv_file = declare_param[str](self, "hsv_config_file", "HSV config file path")
 
-        self.camera = CameraManager(self, self.frames_config.world)
         self.hsv_config_manager = HSVConfigManager(self, hsv_file)
+        self.camera = CameraManager(
+            self,
+            self.frames_config.world,
+            hsv_config_getter=self.hsv_config_manager.get_hsv_config,
+        )
         self.board_state_manager = BoardStateManager(self)
 
         self.transformation_manager = TransformationManager(

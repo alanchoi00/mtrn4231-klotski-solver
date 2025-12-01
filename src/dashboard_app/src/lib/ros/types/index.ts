@@ -3,6 +3,7 @@ export * from "./board.msg";
 export * from "./cell.msg";
 export * from "./piece.msg";
 export * from "./ui-command.msg";
+export * from "./hsv-ranges.msg";
 
 export interface RosStringMsg {
   data: string;
