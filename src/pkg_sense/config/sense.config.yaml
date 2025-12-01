@@ -25,7 +25,7 @@ sense:
     # Board offset and frame ID
     board_offset_x_m: 0.040 # 40mm right (marker frame X)
     board_offset_y_m: 0.040 # 40mm up (marker frame Y)
-    board_frame_id: "klotski_board" # board frame ID (bottom-left corner)
+    board_frame_id: "klotski_board" # board frame ID (offset from bottom-left marker)
 
     board_piece_counts:
       red: 1

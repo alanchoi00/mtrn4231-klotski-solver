@@ -30,6 +30,7 @@ def generate_launch_description():
                     "enable_depth:=true",
                     "enable_infra1:=false",
                     "enable_infra2:=false",
+                    "rgb_camera.exposure:=1000",
                 ],
                 output="screen",
                 name="realsense_camera",

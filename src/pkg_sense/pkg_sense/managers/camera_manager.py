@@ -23,9 +23,9 @@ class CameraManager:
         self.intrinsics: Optional[rs.intrinsics] = None  # rs.intrinsics
 
         # Subscribers for camera topics
-        self.image_sub_topic = "/camera/camera/image_raw"
+        self.image_sub_topic = "/camera/camera/color/image_raw"
         self.point_cloud_sub_topic = "/camera/camera/aligned_depth_to_color/image_raw"
-        self.cam_info_sub_topic = "/camera/camera/aligned_depth_to_color/camera_info"
+        self.cam_info_sub_topic = "/camera/camera/depth/camera_info"
         self.image_sub = self.node.create_subscription(
             Image, self.image_sub_topic, self.arm_image_callback, 10
         )

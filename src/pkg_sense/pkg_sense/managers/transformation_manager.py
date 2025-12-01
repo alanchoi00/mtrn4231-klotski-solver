@@ -11,6 +11,8 @@ from geometry_msgs.msg import PoseStamped, TransformStamped
 from rclpy.duration import Duration
 from rclpy.time import Time
 
+import tf2_geometry_msgs  # noqa: F401
+
 from ..services.aruco_detector import TARGET_IDS, ArucoInfoList
 from ..services.transformation_math import (
     average_quaternions,
@@ -43,7 +45,9 @@ class TransformationManager:
     """
 
     TF_RESOLUTION_S = 0.1  # seconds
-    TF_LOOKUP_TIMEOUT_DURATION = Duration(nanoseconds=200_000_000)  # 0.2s
+    TF_LOOKUP_TIMEOUT_DURATION = Duration(
+        seconds=1
+    )  # 1s - allow time for TF tree to populate
     TF_TRANSFORM_TIMEOUT_DURATION = Duration(nanoseconds=200_000_000)  # 0.2s
 
     def __init__(
@@ -90,6 +94,35 @@ class TransformationManager:
             self.TF_RESOLUTION_S, self._tf_timer_callback
         )
 
+    def wait_for_base_tf(self, timeout_sec: float = 5.0) -> bool:
+        """
+        Wait for the base TF tree (base_frame -> camera_frame) to become available.
+        Should be called before attempting board capture.
+
+        Returns True if the transform is available, False if timed out.
+        """
+        try:
+            can_transform = self.tf_buffer.can_transform(
+                self.base_frame,
+                self.camera_frame,
+                Time(seconds=0),
+                timeout=Duration(seconds=int(timeout_sec)),
+            )
+            if can_transform:
+                self.node.get_logger().info(
+                    f"TF tree ready: {self.base_frame} <- {self.camera_frame}"
+                )
+                return True
+            else:
+                self.node.get_logger().warn(
+                    f"TF tree not available after {timeout_sec}s: "
+                    f"{self.base_frame} <- {self.camera_frame}"
+                )
+                return False
+        except Exception as e:
+            self.node.get_logger().warn(f"Error waiting for base TF: {e}")
+            return False
+
     def update_markers(
         self,
         *,
@@ -102,11 +135,24 @@ class TransformationManager:
         Main entrypoint called from the sensing pipeline.
 
         Returns: mapping marker_id -> PoseStamped (in camera_frame)
+
+        Raises:
+            RuntimeError: If intrinsics are not available (camera info not received)
         """
         marker_poses_cam: Dict[int, PoseStamped] = {}
 
         if aruco_info is None:
-            return marker_poses_cam
+            raise RuntimeError(
+                "aruco_info is None. This should never happen in normal flow. "
+                "Check that detect_aruco_markers() is being called correctly."
+            )
+
+        if intrinsics is None:
+            raise RuntimeError(
+                "Camera intrinsics not available. "
+                "Ensure the camera info topic is publishing "
+                f"(expected: /camera/camera/aligned_depth_to_color/camera_info)"
+            )
 
         camera_matrix, dist_coeffs = self._build_camera_matrices(intrinsics)
 
@@ -142,6 +188,13 @@ class TransformationManager:
                 and intrinsics is not None
             ):
                 self._debug_log_pnp_vs_depth(info, depth_image, intrinsics, stamp)
+
+        # Validate that at least some markers were processed
+        if not marker_poses_cam:
+            self.node.get_logger().warn(
+                "[update_markers] No marker poses computed. "
+                "PnP may have failed for all markers."
+            )
 
         # Always try to publish board frame if we have the ref marker
         if self.board_ref_marker_id in marker_poses_cam:
@@ -198,7 +251,7 @@ class TransformationManager:
         self.tf_broadcaster.sendTransform(tf_msg)
         self._cached_tf[self.board_frame] = tf_msg
 
-        self.node.get_logger().debug(
+        self.node.get_logger().info(
             f"Published TF: aruco_{marker_id} -> {self.board_frame}"
         )
 
@@ -208,14 +261,19 @@ class TransformationManager:
         """
         Lookup transform between frames.
         Returns None if unavailable.
+
+        Note: If time is None, uses Time(seconds=0) to get the latest available
+        transform rather than the current time, which avoids extrapolation issues.
         """
-        time = time or self.node.get_clock().now()
+        # Use Time(seconds=0) for "latest available" to avoid timing issues
+        # when looking up freshly published transforms
+        lookup_time = time if time is not None else Time(seconds=0)
 
         try:
             tf_msg = self.tf_buffer.lookup_transform(
                 target_frame,
                 source_frame,
-                time,
+                lookup_time,
                 timeout=self.TF_LOOKUP_TIMEOUT_DURATION,
             )
             return tf_msg
@@ -227,14 +285,55 @@ class TransformationManager:
             return None
 
     def get_board_pose_in_base(
-        self, base_frame: str, board_frame: str, stamp: Time
+        self,
+        base_frame: str,
+        board_frame: str,
+        stamp: Optional[Time] = None,
+        wait_for_transform: bool = False,
     ) -> Optional[PoseStamped]:
         """
         Returns the board pose expressed in base frame coordinates.
 
         - Looks for transform: base_link <- board
         - Returns PoseStamped or None if TF unavailable
+
+        Args:
+            base_frame: Target frame (e.g., "base_link")
+            board_frame: Source frame (e.g., "klotski_board")
+            stamp: Time for lookup. If None, uses latest available transform.
+            wait_for_transform: If True, wait for the transform to become available.
         """
+        # Use Time(seconds=0) for "latest available" when stamp is None
+        lookup_time = stamp if stamp is not None else Time(seconds=0)
+
+        if wait_for_transform:
+            # Wait for the transform to become available
+            # Use a longer timeout and retry logic for robustness
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    can_transform = self.tf_buffer.can_transform(
+                        base_frame,
+                        board_frame,
+                        lookup_time,
+                        timeout=self.TF_LOOKUP_TIMEOUT_DURATION,
+                    )
+                    if can_transform:
+                        break
+                    self.node.get_logger().debug(
+                        f"[tf] Attempt {attempt + 1}/{max_retries}: Transform not yet available"
+                    )
+                except Exception as e:
+                    self.node.get_logger().debug(
+                        f"[tf] Attempt {attempt + 1}/{max_retries}: {e}"
+                    )
+            else:
+                self.node.get_logger().warn(
+                    f"[tf] Timed out waiting for transform {base_frame} <- {board_frame} "
+                    f"after {max_retries} attempts"
+                )
+                return None
+
         tf_msg = self.lookup_transform(
             target_frame=base_frame, source_frame=board_frame, time=stamp
         )
@@ -254,6 +353,85 @@ class TransformationManager:
 
         pose.pose.orientation = tf_msg.transform.rotation
         return pose
+
+    def compute_board_pose_in_base(
+        self,
+        marker_pose_cam: PoseStamped,
+    ) -> Optional[PoseStamped]:
+        """
+        Compute the board pose in base frame directly from marker pose.
+
+        This avoids the race condition of waiting for our own published
+        klotski_board frame to appear in the TF buffer.
+
+        The board is offset from the marker by (board_offset_x_m, board_offset_y_m)
+        in the marker's local frame.
+
+        Args:
+            marker_pose_cam: The reference marker pose in camera frame
+
+        Returns:
+            PoseStamped of board in base frame, or None if transform fails
+        """
+        import tf_transformations
+
+        # Get marker pose components
+        marker_pos = np.array(
+            [
+                marker_pose_cam.pose.position.x,
+                marker_pose_cam.pose.position.y,
+                marker_pose_cam.pose.position.z,
+            ]
+        )
+        marker_quat = [
+            marker_pose_cam.pose.orientation.x,
+            marker_pose_cam.pose.orientation.y,
+            marker_pose_cam.pose.orientation.z,
+            marker_pose_cam.pose.orientation.w,
+        ]
+
+        # Build 4x4 transform matrix for marker in camera frame
+        marker_mat = tf_transformations.quaternion_matrix(marker_quat)
+        marker_mat[:3, 3] = marker_pos
+
+        # Build offset transform (marker -> board)
+        offset_mat = np.eye(4)
+        offset_mat[0, 3] = self.board_offset_x_m
+        offset_mat[1, 3] = self.board_offset_y_m
+
+        # Board pose in camera frame = marker_in_cam @ offset
+        board_in_cam_mat = marker_mat @ offset_mat
+
+        # Create PoseStamped for board in camera frame
+        board_pos_cam = board_in_cam_mat[:3, 3]
+        board_quat_cam = tf_transformations.quaternion_from_matrix(board_in_cam_mat)
+
+        board_cam = PoseStamped()
+        board_cam.header = marker_pose_cam.header  # same stamp and frame
+        board_cam.pose.position.x = float(board_pos_cam[0])
+        board_cam.pose.position.y = float(board_pos_cam[1])
+        board_cam.pose.position.z = float(board_pos_cam[2])
+        board_cam.pose.orientation.x = float(board_quat_cam[0])
+        board_cam.pose.orientation.y = float(board_quat_cam[1])
+        board_cam.pose.orientation.z = float(board_quat_cam[2])
+        board_cam.pose.orientation.w = float(board_quat_cam[3])
+
+        # Transform board pose from camera frame to base frame
+        try:
+            board_base = cast(
+                PoseStamped,
+                self.tf_buffer.transform(
+                    board_cam,
+                    self.base_frame,
+                    timeout=self.TF_LOOKUP_TIMEOUT_DURATION,
+                ),
+            )
+            return board_base
+        except Exception as e:
+            self.node.get_logger().warn(
+                f"[tf] Failed to transform board pose to {self.base_frame}: {e}"
+            )
+            return None
 
     @staticmethod
     def _build_camera_matrices(
@@ -428,7 +606,7 @@ class TransformationManager:
                 ),
             )
 
-            self.node.get_logger().debug(
+            self.node.get_logger().info(
                 f"[marker {self.board_ref_marker_id}] "
                 f"{self.base_frame} depth: "
                 f"x={depth_base.pose.position.x:.3f}, "
