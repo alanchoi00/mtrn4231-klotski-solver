@@ -60,6 +60,7 @@ class HSVConfigManager:
     """
     Manages HSV configuration loading, access, and runtime updates.
     Provides ROS2 services to get/set HSV values and export as YAML.
+    Publishes current HSV ranges on a topic.
     """
 
     def __init__(self, node: "Sense", config_path: str | Path):
@@ -70,6 +71,13 @@ class HSVConfigManager:
         pkg_share = get_package_share_directory("pkg_sense")
         self._installed_config_path = os.path.join(pkg_share, "config", config_path)
         self._hsv_config = HSVConfig.load_hsv_config(self._installed_config_path)
+
+        # Create HSV ranges publisher
+        self._hsv_ranges_pub = node.create_publisher(
+            HSVRangesMsg,
+            "/sense/hsv_ranges",
+            10,
+        )
 
         # Create HSV config services
         self._get_hsv_srv = node.create_service(
@@ -91,6 +99,10 @@ class HSVConfigManager:
             "HSV config services ready: /sense/get_hsv_ranges, "
             "/sense/set_hsv_ranges, /sense/export_hsv_ranges_yaml"
         )
+        node.get_logger().info("HSV ranges publisher ready: /sense/hsv_ranges")
+
+        # Publish initial HSV ranges
+        self.publish_hsv_ranges()
 
     def get_hsv_range(self, name: str) -> HSVRange | None:
         return self._hsv_config.ranges.get(name, None)
@@ -99,12 +111,23 @@ class HSVConfigManager:
         return self._hsv_config
 
     def set_hsv_range(self, name: str, hsv_range: HSVRange) -> None:
-        """Update a single HSV range at runtime."""
+        """Update a single HSV range at runtime and publish the update."""
         self._hsv_config.ranges[name] = hsv_range
+        self.publish_hsv_ranges()
 
     def set_hsv_config(self, config: HSVConfig) -> None:
-        """Replace the entire HSV config at runtime."""
+        """Replace the entire HSV config at runtime and publish the update."""
         self._hsv_config = config
+        self.publish_hsv_ranges()
+
+    def publish_hsv_ranges(self) -> None:
+        """Publish current HSV ranges to the topic."""
+        ranges_msg = HSVRangesMsg()
+        ranges_msg.ranges = [
+            self._hsv_range_to_msg(hsv_range)
+            for hsv_range in self._hsv_config.ranges.values()
+        ]
+        self._hsv_ranges_pub.publish(ranges_msg)
 
     def to_yaml_string(self) -> str:
         """Convert current HSV config to a YAML formatted string."""
