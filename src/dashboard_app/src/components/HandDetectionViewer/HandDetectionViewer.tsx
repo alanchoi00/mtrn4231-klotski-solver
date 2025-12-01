@@ -159,20 +159,38 @@ export const HandDetectionViewer: React.FC<HandDetectionViewerProps> = ({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (isDragging) {
-        setPosition({
-          x: e.clientX - dragOffset.x,
-          y: e.clientY - dragOffset.y,
-        });
+        // Calculate new position
+        let newX = e.clientX - dragOffset.x;
+        let newY = e.clientY - dragOffset.y;
+
+        // Bound to viewport
+        const maxX = window.innerWidth - size.width;
+        const maxY = window.innerHeight - size.height;
+
+        newX = Math.max(0, Math.min(newX, maxX));
+        newY = Math.max(0, Math.min(newY, maxY));
+
+        setPosition({ x: newX, y: newY });
       } else if (isResizing && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        const newWidth = Math.max(320, e.clientX - rect.left);
+        // Limit width to not exceed viewport
+        const maxWidth = window.innerWidth - position.x;
+        const newWidth = Math.max(
+          320,
+          Math.min(e.clientX - rect.left, maxWidth)
+        );
         // Calculate height to maintain aspect ratio (accounting for title bar + status bar = 48px)
         const chromeHeight = 48; // title bar (40px) + status bar (8px)
         const contentHeight = newWidth / imageAspectRatio;
-        const newHeight = contentHeight + chromeHeight;
+        // Limit height to not exceed viewport
+        const maxHeight = window.innerHeight - position.y;
+        const newHeight = Math.max(
+          240,
+          Math.min(contentHeight + chromeHeight, maxHeight)
+        );
         setSize({
           width: newWidth,
-          height: Math.max(240, newHeight),
+          height: newHeight,
         });
       } else if (draggingPointIndex !== null && imageContainerRef.current) {
         // Handle ROI point dragging
@@ -193,7 +211,15 @@ export const HandDetectionViewer: React.FC<HandDetectionViewerProps> = ({
         });
       }
     },
-    [isDragging, isResizing, dragOffset, draggingPointIndex, imageAspectRatio]
+    [
+      isDragging,
+      isResizing,
+      dragOffset,
+      draggingPointIndex,
+      imageAspectRatio,
+      size,
+      position,
+    ]
   );
 
   const handleMouseUp = useCallback(() => {
