@@ -83,7 +83,7 @@ class ActionExecutor:
         return True
 
     def _start_grip_open_phase(self) -> bool:
-        """Phase 2: Open gripper."""
+        """Phase 4: Open gripper."""
         if not self.grip_client.wait_for_server(timeout_sec=0.2):
             self._ui("[exec] /gripper_manipulation/grip_piece action server not available")
             return False
@@ -92,7 +92,7 @@ class ActionExecutor:
         goal.grip_action = GripPiece.Goal.GRIP_OPEN
 
         self._set_busy(True)
-        self._ui(f"[exec] Phase 2/5: Opening gripper")
+        self._ui(f"[exec] Phase 4/5: Opening gripper")
         send_fut = self.grip_client.send_goal_async(goal, feedback_callback=self._on_grip_feedback)
         send_fut.add_done_callback(self._on_grip_goal_response)
         return True
@@ -113,7 +113,7 @@ class ActionExecutor:
         return True
 
     def _start_grip_close_phase(self) -> bool:
-        """Phase 4: Close gripper."""
+        """Phase 2: Close gripper."""
         if not self.grip_client.wait_for_server(timeout_sec=0.2):
             self._ui("[exec] /gripper_manipulation/grip_piece action server not available")
             return False
@@ -122,7 +122,7 @@ class ActionExecutor:
         goal.grip_action = GripPiece.Goal.GRIP_CLOSE
 
         self._set_busy(True)
-        self._ui(f"[exec] Phase 4/5: Closing gripper")
+        self._ui(f"[exec] Phase 2/5: Closing gripper")
         send_fut = self.grip_client.send_goal_async(goal, feedback_callback=self._on_grip_feedback)
         send_fut.add_done_callback(self._on_grip_goal_response)
         return True

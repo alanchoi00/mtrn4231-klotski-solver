@@ -57,14 +57,13 @@ class ServiceManager:
             brain.ctx.expected_board = self._derive_expected_board(last_sensed_board, last_move)
             brain.ctx.sensed = res.state
             self._ui(f"[sense] Captured board: {brain.ui_manager.board_to_pattern(res.state.board)} with {len(res.state.board.pieces)} pieces")
-            # New sensing invalidates plan to trigger replanning
-            next_phase = Phase.next_phase(brain.ctx.current_phase)
-            if next_phase is not None:
-                brain.ctx.current_phase = next_phase
-                brain.get_logger().debug(f"[sense] Advanced to next phase {brain.ctx.current_phase} after sensing")
+            # Only advance phase if we're actually in SENSE phase
+            # This prevents accidentally skipping phases if sense result arrives late
+            if Phase.is_sense_phase(brain.ctx.current_phase):
+                brain.ctx.current_phase = Phase.PLAN
+                brain.get_logger().debug(f"[sense] Advanced from SENSE to PLAN phase")
             else:
-                brain.get_logger().warn(f"[sense] No next phase from current_phase={brain.ctx.current_phase}")
-                raise RuntimeError("Invalid execution phase transition")
+                brain.get_logger().debug(f"[sense] Sense result received but not in SENSE phase (current_phase={Phase.get_name(brain.ctx.current_phase)}), not advancing phase")
             brain.tick(TickSource.SENSE_DONE)
         else:
             self._ui(f"[sense] Capture failed: {res.note}")
