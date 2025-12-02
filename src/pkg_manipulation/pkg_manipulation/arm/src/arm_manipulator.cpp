@@ -20,9 +20,9 @@ ArmManipulator::ArmManipulator() : Node("arm_manipulator") {
   board_rotation_yaw_ = 0.0;
   if (use_dynamic_board_pose_) {
     board_pose_sub_ =
-        this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/board_pose", 10,
-            std::bind(&ArmManipulator::board_pose_callback, this,
+        this->create_subscription<klotski_interfaces::msg::BoardState>(
+            "/board_state", 10,
+            std::bind(&ArmManipulator::board_state_callback, this,
                       std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(),
                 "✓ Subscribed to /board_pose for dynamic board updates");
@@ -134,8 +134,11 @@ void ArmManipulator::declareAndLoadParameters() {
   gripper_height_ = this->get_parameter("gripper_height").as_double();
   approach_offset_ = this->get_parameter("approach_offset").as_double();
   retreat_offset_ = this->get_parameter("retreat_offset").as_double();
-  board_center_x_ = this->get_parameter("board_center_x").as_double();
-  board_center_y_ = this->get_parameter("board_center_y").as_double();
+  // Note: These are fallback values. When use_dynamic_board_pose_ is true,
+  // board_origin is updated from BoardState messages (BL corner from sense
+  // node)
+  board_origin_x_ = this->get_parameter("board_center_x").as_double();
+  board_origin_y_ = this->get_parameter("board_center_y").as_double();
   board_width_ = this->get_parameter("board_width").as_double();
   board_length_ = this->get_parameter("board_length").as_double();
   cell_size_ = this->get_parameter("cell_size").as_double();
@@ -331,17 +334,11 @@ bool ArmManipulator::execute_approach(
   feedback->progress = 0.5;
   goal_handle->publish_feedback(feedback);
 
-  // Try Cartesian path first for smoother motion
+  // Use Cartesian path only for predictable motion (no fallback to regular planning)
   bool success = planAndExecuteCartesianPath(target_pose, false);
 
   if (!success) {
-    RCLCPP_WARN(this->get_logger(),
-                "Cartesian planning failed, trying regular planning");
-    success = planAndExecuteSmoothedMotion(target_pose, false);
-  }
-
-  if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "All planning attempts failed");
+    RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed");
     RCLCPP_ERROR(this->get_logger(), "Current robot pose: (%.3f, %.3f, %.3f)",
                  move_group_interface_->getCurrentPose().pose.position.x,
                  move_group_interface_->getCurrentPose().pose.position.y,
@@ -372,14 +369,11 @@ bool ArmManipulator::execute_pick_place(
   feedback->progress = 0.3;
   goal_handle->publish_feedback(feedback);
 
-  // For vertical movements like pick/place, Cartesian path is ideal
+  // For vertical movements like pick/place, Cartesian path is required
   bool success = planAndExecuteCartesianPath(target_pose, true);
 
   if (!success) {
-    RCLCPP_WARN(
-        this->get_logger(),
-        "Cartesian planning failed for pick/place, trying regular planning");
-    success = planAndExecuteSmoothedMotion(target_pose, true);
+    RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed for pick/place");
   }
 
   feedback->progress = 0.6;
@@ -400,27 +394,69 @@ bool ArmManipulator::execute_retreat(
   goal_handle->publish_feedback(feedback);
 
   // Get current x, y position, but set new z height
-  geometry_msgs::msg::PoseStamped current_pose;
-  current_pose.header.frame_id = move_group_interface_->getPlanningFrame();
-  current_pose.pose = move_group_interface_->getCurrentPose().pose;
+  geometry_msgs::msg::PoseStamped target_pose;
+  target_pose.header.frame_id = move_group_interface_->getPlanningFrame();
+  target_pose.pose = move_group_interface_->getCurrentPose().pose;
 
-  current_pose.pose.position.z = retreat_height_;
+  target_pose.pose.position.z = retreat_height_;
 
   RCLCPP_INFO(this->get_logger(), "Target: (%.3f, %.3f, %.3f)",
-              current_pose.pose.position.x, current_pose.pose.position.y,
-              current_pose.pose.position.z);
+              target_pose.pose.position.x, target_pose.pose.position.y,
+              target_pose.pose.position.z);
 
   feedback->progress = 0.4;
   goal_handle->publish_feedback(feedback);
 
-  // For retreat (vertical movement), Cartesian path is ideal
-  bool success = planAndExecuteCartesianPath(current_pose, true);
+  // For retreat (vertical movement), use a more lenient Cartesian threshold
+  // since it's a simple vertical lift that may have minor IK deviations
+  std::vector<geometry_msgs::msg::Pose> waypoints;
+  waypoints.push_back(target_pose.pose);
+
+  moveit_msgs::msg::RobotTrajectory trajectory;
+  double fraction = move_group_interface_->computeCartesianPath(
+      waypoints, cartesian_eef_step_, cartesian_jump_threshold_, trajectory);
+
+  RCLCPP_INFO(this->get_logger(),
+              "Retreat Cartesian path: %.2f%% achieved", fraction * 100.0);
+
+  bool success = false;
+  // Use a lower threshold (0.8) for retreat since it's a simple vertical movement
+  // and we prioritize completing the retreat over perfect path accuracy
+  const double retreat_threshold = 0.8;
+  if (fraction >= retreat_threshold) {
+    // Apply time parameterization with velocity scaling
+    robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
+                                         move_group_interface_->getName());
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(), trajectory);
+
+    trajectory_processing::IterativeParabolicTimeParameterization iptp;
+    bool time_param_success = iptp.computeTimeStamps(
+        rt, max_velocity_scaling_factor_, max_acceleration_scaling_factor_);
+
+    if (time_param_success) {
+      rt.getRobotTrajectoryMsg(trajectory);
+    }
+
+    moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
+    cartesian_plan.trajectory_ = trajectory;
+
+    success = (move_group_interface_->execute(cartesian_plan) ==
+               moveit::core::MoveItErrorCode::SUCCESS);
+  } else {
+    RCLCPP_WARN(this->get_logger(),
+                "Cartesian retreat failed (%.2f%%), trying joint-space planning",
+                fraction * 100.0);
+    // Fallback to regular planning for retreat only - it's less critical than approach/pick_place
+    move_group_interface_->setPoseTarget(target_pose);
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    if (move_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS) {
+      success = (move_group_interface_->execute(plan) ==
+                 moveit::core::MoveItErrorCode::SUCCESS);
+    }
+  }
 
   if (!success) {
-    RCLCPP_WARN(
-        this->get_logger(),
-        "Cartesian planning failed for retreat, trying regular planning");
-    success = planAndExecuteSmoothedMotion(current_pose, true);
+    RCLCPP_ERROR(this->get_logger(), "Retreat planning failed");
   }
 
   feedback->progress = 0.7;
@@ -458,113 +494,45 @@ geometry_msgs::msg::PoseStamped ArmManipulator::calculatePieceCenterPose(
   return calculateWorldPose(center_col, center_row);
 }
 
-// geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double
-// col,
-//                                                                    double
-//                                                                    row) {
-//   geometry_msgs::msg::PoseStamped pose;
-//   pose.header.frame_id = "base_link";
-//   pose.header.stamp = this->now();
-
-//   // Calculate bottom-left corner position from board center
-//   double grid_origin_x = board_center_x_ - board_width_ / 2.0;
-//   double grid_origin_y = board_center_y_ - board_length_ / 2.0;
-
-//   // Calculate cell position
-//   pose.pose.position.x = grid_origin_x + col * cell_size_;
-//   pose.pose.position.y = grid_origin_y + row * cell_size_;
-//   pose.pose.position.z = board_height_;  // Use configured board height
-
-//   // Set end effector facing down
-//   tf2::Quaternion q;
-//   q.setRPY(0.0, M_PI, 0.0);  // Roll = 180°
-//   pose.pose.orientation = tf2::toMsg(q);
-
-//   return pose;
-// }
-
-// geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double
-// col,
-//                                                                    double
-//                                                                    row) {
-//   geometry_msgs::msg::PoseStamped pose;
-//   pose.header.frame_id = "base_link";
-//   pose.header.stamp = this->now();
-
-//   // 假设棋盘是4列x5行，编号从0开始
-//   double local_x = (col - 1.5) * cell_size_;  // 列方向，中心在1.5
-//   double local_y = (2.0 - row) * cell_size_;  // 行方向，中心在2.0
-
-//   double rotated_x, rotated_y;
-//   if (use_dynamic_board_pose_) {
-//     double cos_theta = std::cos(board_rotation_yaw_);
-//     double sin_theta = std::sin(board_rotation_yaw_);
-
-//     rotated_x = local_x * cos_theta - local_y * sin_theta;
-//     rotated_y = local_x * sin_theta + local_y * cos_theta;
-//   } else {
-//     rotated_x = local_x;
-//     rotated_y = local_y;
-//   }
-
-//   pose.pose.position.x = board_center_x_ + rotated_x;
-//   pose.pose.position.y = board_center_y_ + rotated_y;
-//   pose.pose.position.z = 0.0;
-
-//   tf2::Quaternion q;
-//   if (use_dynamic_board_pose_) {
-//     q.setRPY(M_PI, 0, board_rotation_yaw_);
-//   } else {
-//     q.setRPY(M_PI, 0, 0);
-//   }
-
-//   pose.pose.orientation.x = q.x();
-//   pose.pose.orientation.y = q.y();
-//   pose.pose.orientation.z = q.z();
-//   pose.pose.orientation.w = q.w();
-
-//   return pose;
-// }
-
 geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double col,
                                                                    double row) {
   geometry_msgs::msg::PoseStamped pose;
-  pose.header.frame_id = "base_link";
   pose.header.stamp = this->now();
+  pose.header.frame_id = "base_link";
 
-  // 计算局部坐标
-  double local_x = (col - 1.5) * cell_size_;
-  double local_y = (2.0 - row) * cell_size_;
+  // Cell position relative to board origin (bottom-left corner)
+  // Cell (0,0) is at the origin, cell (3,4) is at top-right
+  // Add 0.5 to center on the cell (origin is at corner of cell 0,0)
+  const double local_x = (col + 0.5) * cell_size_;
+  const double local_y = (row + 0.5) * cell_size_;
 
-  // 应用旋转
-  double rotated_x, rotated_y;
+  double rotated_x = local_x;
+  double rotated_y = local_y;
   if (use_dynamic_board_pose_) {
-    double cos_theta = std::cos(board_rotation_yaw_);
-    double sin_theta = std::sin(board_rotation_yaw_);
+    const double cos_theta = std::cos(board_rotation_yaw_);
+    const double sin_theta = std::sin(board_rotation_yaw_);
     rotated_x = local_x * cos_theta - local_y * sin_theta;
     rotated_y = local_x * sin_theta + local_y * cos_theta;
-  } else {
-    rotated_x = local_x;
-    rotated_y = local_y;
   }
 
-  // 转换到base_link
-  pose.pose.position.x = board_center_x_ + rotated_x;
-  pose.pose.position.y = board_center_y_ + rotated_y;
-  pose.pose.position.z = 0.0;
+  // board_origin is the bottom-left corner of the board (cell 0,0 corner)
+  pose.pose.position.x = board_origin_x_ + rotated_x;
+  pose.pose.position.y = board_origin_y_ + rotated_y;
 
-  // 设置姿态
+  pose.pose.position.z = board_height_;
+
   tf2::Quaternion q;
-  if (use_dynamic_board_pose_) {
-    q.setRPY(M_PI, 0, board_rotation_yaw_);
-  } else {
-    q.setRPY(M_PI, 0, 0);
-  }
+  q.setRPY(0.0, M_PI, board_rotation_yaw_);
+  pose.pose.orientation = tf2::toMsg(q);
 
-  pose.pose.orientation.x = q.x();
-  pose.pose.orientation.y = q.y();
-  pose.pose.orientation.z = q.z();
-  pose.pose.orientation.w = q.w();
+  // debug
+  RCLCPP_INFO(this->get_logger(),
+              "cell->world: (col=%.2f, row=%.2f) -> (x=%.3f, y=%.3f) | "
+              "board_origin=(%.3f, %.3f), local=(%.3f, %.3f), rotated=(%.3f, "
+              "%.3f), yaw=%.1f deg",
+              col, row, pose.pose.position.x, pose.pose.position.y,
+              board_origin_x_, board_origin_y_, local_x, local_y, rotated_x,
+              rotated_y, board_rotation_yaw_ * 180.0 / M_PI);
 
   return pose;
 }
@@ -639,25 +607,10 @@ bool ArmManipulator::planAndExecuteCartesianPath(
   // Get current pose
   auto current_pose = move_group_interface_->getCurrentPose();
 
-  // Create waypoints for Cartesian path
+  // Create waypoints for strictly linear Cartesian path (no intermediate waypoints)
   std::vector<geometry_msgs::msg::Pose> waypoints;
 
-  // Add intermediate waypoint (optional for better path)
-  geometry_msgs::msg::Pose intermediate_pose = current_pose.pose;
-  intermediate_pose.position.z =
-      std::max(current_pose.pose.position.z, target_pose.pose.position.z) +
-      0.05;
-
-  // Only add intermediate waypoint if we're moving significantly
-  double distance =
-      sqrt(pow(target_pose.pose.position.x - current_pose.pose.position.x, 2) +
-           pow(target_pose.pose.position.y - current_pose.pose.position.y, 2));
-
-  if (distance > 0.1) {  // If moving more than 10cm horizontally
-    waypoints.push_back(intermediate_pose);
-  }
-
-  // Add final target
+  // Only add the final target - strict linear motion from current to target
   waypoints.push_back(target_pose.pose);
 
   // Set constraints if requested
@@ -678,6 +631,26 @@ bool ArmManipulator::planAndExecuteCartesianPath(
 
   bool success = false;
   if (fraction > cartesian_fraction_threshold_) {  // Use configurable threshold
+    // Apply time parameterization with velocity scaling to the Cartesian trajectory
+    robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
+                                         move_group_interface_->getName());
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(), trajectory);
+
+    // Apply velocity and acceleration scaling
+    trajectory_processing::IterativeParabolicTimeParameterization iptp;
+    bool time_param_success = iptp.computeTimeStamps(
+        rt, max_velocity_scaling_factor_, max_acceleration_scaling_factor_);
+
+    if (time_param_success) {
+      rt.getRobotTrajectoryMsg(trajectory);
+      RCLCPP_INFO(this->get_logger(), 
+                  "Applied velocity scaling (%.2f) to Cartesian trajectory",
+                  max_velocity_scaling_factor_);
+    } else {
+      RCLCPP_WARN(this->get_logger(),
+                  "Time parameterization failed, using original trajectory");
+    }
+
     // Execute the Cartesian trajectory
     moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
     cartesian_plan.trajectory_ = trajectory;
@@ -685,13 +658,11 @@ bool ArmManipulator::planAndExecuteCartesianPath(
     success = (move_group_interface_->execute(cartesian_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
   } else {
-    RCLCPP_WARN(this->get_logger(),
-                "Cartesian path planning failed (%.2f%%), falling back to "
-                "regular planning",
-                fraction * 100.0);
-
-    // Fall back to regular motion planning
-    success = planAndExecuteSmoothedMotion(target_pose, use_constraints);
+    RCLCPP_ERROR(this->get_logger(),
+                "Cartesian path planning failed (%.2f%% < %.2f%% threshold). "
+                "No fallback to regular planning.",
+                fraction * 100.0, cartesian_fraction_threshold_ * 100.0);
+    success = false;
   }
 
   // Clear constraints
@@ -755,32 +726,15 @@ bool ArmManipulator::planAndExecuteSmoothedMotion(
   return success;
 }
 
-// void ArmManipulator::board_pose_callback(
-//     const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-//   // 更新棋盘中心位置
-//   board_center_x_ = msg->pose.position.x;
-//   board_center_y_ = msg->pose.position.y;
+void ArmManipulator::board_state_callback(
+    const klotski_interfaces::msg::BoardState::SharedPtr msg) {
+  // board_pose is the bottom-left corner (origin) of the board frame
+  board_origin_x_ = msg->board_pose.pose.position.x;
+  board_origin_y_ = msg->board_pose.pose.position.y;
 
-//   // 提取yaw角度（绕z轴的旋转）
-//   tf2::Quaternion q(msg->pose.orientation.x, msg->pose.orientation.y,
-//                     msg->pose.orientation.z, msg->pose.orientation.w);
-
-//   tf2::Matrix3x3 m(q);
-//   double roll, pitch, yaw;
-//   m.getRPY(roll, pitch, yaw);
-//   board_rotation_yaw_ = yaw;
-
-//   RCLCPP_INFO(this->get_logger(), "Board updated: pos=(%.3f, %.3f),
-//   yaw=%.1f°",
-//               board_center_x_, board_center_y_, yaw * 180.0 / M_PI);
-// }
-void ArmManipulator::board_pose_callback(
-    const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-  board_center_x_ = msg->pose.position.x;
-  board_center_y_ = msg->pose.position.y;
-
-  tf2::Quaternion q(msg->pose.orientation.x, msg->pose.orientation.y,
-                    msg->pose.orientation.z, msg->pose.orientation.w);
+  tf2::Quaternion q(
+      msg->board_pose.pose.orientation.x, msg->board_pose.pose.orientation.y,
+      msg->board_pose.pose.orientation.z, msg->board_pose.pose.orientation.w);
 
   tf2::Matrix3x3 m(q);
   double roll, pitch, yaw;
@@ -788,8 +742,8 @@ void ArmManipulator::board_pose_callback(
   board_rotation_yaw_ = yaw;
 
   RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                       "Board: pos=(%.3f,%.3f), yaw=%.1f°", board_center_x_,
-                       board_center_y_, yaw * 180.0 / M_PI);
+                       "Board origin (BL corner): pos=(%.3f,%.3f), yaw=%.1f°",
+                       board_origin_x_, board_origin_y_, yaw * 180.0 / M_PI);
 }
 
 }  // namespace pkg_manipulation

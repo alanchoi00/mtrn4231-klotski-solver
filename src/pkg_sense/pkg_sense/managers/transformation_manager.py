@@ -373,7 +373,7 @@ class TransformationManager:
         Returns:
             PoseStamped of board in base frame, or None if transform fails
         """
-        import tf_transformations
+        from scipy.spatial.transform import Rotation
 
         # Get marker pose components
         marker_pos = np.array(
@@ -391,7 +391,10 @@ class TransformationManager:
         ]
 
         # Build 4x4 transform matrix for marker in camera frame
-        marker_mat = tf_transformations.quaternion_matrix(marker_quat)
+        # scipy uses [x, y, z, w] quaternion order
+        rot = Rotation.from_quat(marker_quat)
+        marker_mat = np.eye(4)
+        marker_mat[:3, :3] = rot.as_matrix()
         marker_mat[:3, 3] = marker_pos
 
         # Build offset transform (marker -> board)
@@ -404,7 +407,8 @@ class TransformationManager:
 
         # Create PoseStamped for board in camera frame
         board_pos_cam = board_in_cam_mat[:3, 3]
-        board_quat_cam = tf_transformations.quaternion_from_matrix(board_in_cam_mat)
+        board_rot = Rotation.from_matrix(board_in_cam_mat[:3, :3])
+        board_quat_cam = board_rot.as_quat()  # returns [x, y, z, w]
 
         board_cam = PoseStamped()
         board_cam.header = marker_pose_cam.header  # same stamp and frame

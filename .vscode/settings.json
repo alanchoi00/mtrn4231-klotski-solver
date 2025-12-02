@@ -121,49 +121,6 @@
     "valarray": "cpp",
     "variant": "cpp"
   },
-  "python.autoComplete.extraPaths": [
-    "${workspaceFolder}/install/pkg_sense/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/pkg_plan/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/pkg_manipulation/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/pkg_brain/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/klotski_interfaces/local/lib/python3.10/dist-packages",
-    "${workspaceFolder}/src/install/pkg_sense/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/pkg_plan/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/pkg_manipulation/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/pkg_brain/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/klotski_interfaces/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ros_ur_driver/install/ur_robot_driver/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ros_ur_driver/install/ur_moveit_config/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ros_ur_driver/install/ur_dashboard_msgs/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ws_moveit2/install/moveit_configs_utils/lib/python3.10/site-packages",
-    "/home/mtrn/4231/ws_moveit2/install/srdfdom/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ws_moveit2/install/moveit_task_constructor_msgs/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ws_moveit2/install/launch_param_builder/lib/python3.10/site-packages",
-    "/opt/ros/humble/lib/python3.10/site-packages",
-    "/opt/ros/humble/local/lib/python3.10/dist-packages"
-  ],
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/install/pkg_sense/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/pkg_plan/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/pkg_manipulation/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/pkg_brain/lib/python3.10/site-packages",
-    "${workspaceFolder}/install/klotski_interfaces/local/lib/python3.10/dist-packages",
-    "${workspaceFolder}/src/install/pkg_sense/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/pkg_plan/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/pkg_manipulation/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/pkg_brain/lib/python3.10/site-packages",
-    "${workspaceFolder}/src/install/klotski_interfaces/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ros_ur_driver/install/ur_robot_driver/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ros_ur_driver/install/ur_moveit_config/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ros_ur_driver/install/ur_dashboard_msgs/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ws_moveit2/install/moveit_configs_utils/lib/python3.10/site-packages",
-    "/home/mtrn/4231/ws_moveit2/install/srdfdom/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ws_moveit2/install/moveit_task_constructor_msgs/local/lib/python3.10/dist-packages",
-    "/home/mtrn/4231/ws_moveit2/install/launch_param_builder/lib/python3.10/site-packages",
-    "/opt/ros/humble/lib/python3.10/site-packages",
-    "/opt/ros/humble/local/lib/python3.10/dist-packages"
-  ],
-  "scm.defaultViewMode": "list",
   "C_Cpp_Runner.msvcBatchPath": "",
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",
@@ -220,5 +177,22 @@
   "C_Cpp_Runner.useLeakSanitizer": false,
   "C_Cpp_Runner.showCompilationTime": false,
   "C_Cpp_Runner.useLinkTimeOptimization": false,
-  "C_Cpp_Runner.msvcSecureNoWarnings": false
+  "C_Cpp_Runner.msvcSecureNoWarnings": false,
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/install/pkg_sense/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/pkg_manipulation/local/lib/python3.10/dist-packages",
+    "${workspaceFolder}/install/pkg_brain/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "/opt/ros/humble/lib/python3.10/site-packages",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages"
+  ],
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/install/pkg_sense/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/pkg_manipulation/local/lib/python3.10/dist-packages",
+    "${workspaceFolder}/install/pkg_brain/lib/python3.10/site-packages",
+    "${workspaceFolder}/install/klotski_interfaces/local/lib/python3.10/dist-packages",
+    "/opt/ros/humble/lib/python3.10/site-packages",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages"
+  ],
+  "cmake.ignoreCMakeListsMissing": true
 }

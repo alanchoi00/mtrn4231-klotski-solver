@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 import rclpy
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from std_msgs.msg import Bool
+from rclpy.timer import Timer
 
 from klotski_interfaces.msg import BoardState
 
-from .context import BrainContext, ExecutionPhase
+from .context import BrainContext, Phase, TickSource
 from .managers import ActionExecutor, PipelineOrchestrator, ServiceManager, UIManager
 from .ui_modes import UIMode
 
@@ -25,8 +29,23 @@ class TaskBrain(Node):
     def __init__(self):
         super().__init__("task_brain")
 
+        self.declare_parameter(
+            "delay_secs",
+            0.0,
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.DOUBLE.value,
+                description="Delay in seconds after move completion (retreat)",
+                read_only=False,
+            ),
+        )
+
         # Initialize context
         self.ctx = BrainContext()
+        self.exec_timer: Optional[Timer] = None
+
+        self.delay_secs: float = (
+            self.get_parameter("delay_secs").get_parameter_value().double_value
+        )
 
         # Initialize managers
         self.ui_manager = UIManager(self)
@@ -40,7 +59,7 @@ class TaskBrain(Node):
         # Set up safety stop subscription
         self._safety_stop_active = False
         self._mode_before_safety_stop: int | None = None
-        self._phase_before_safety_stop: ExecutionPhase | None = None
+        self._phase_before_safety_stop: Phase | None = None
         self.create_subscription(Bool, "/safety/stop", self.on_safety_stop, 10)
 
         self.ui_manager.ui("TaskBrain up. Modes: auto | step | pause | reset")
@@ -50,8 +69,7 @@ class TaskBrain(Node):
         self.ctx.sensed = state
         self.ui_manager.ui(f"BoardState received: {len(state.board.pieces)} pieces")
         # sensing updated -> invalidate plan to trigger replanning
-        self.ctx.plan_received = False
-        self.tick("board_state")
+        self.tick(TickSource.BOARD_STATE)
 
     def on_safety_stop(self, msg: Bool) -> None:
         """Handle safety stop signals from hand detection."""
@@ -74,12 +92,12 @@ class TaskBrain(Node):
             if prev_phase is None:
                 # Was None before, stay at None (no phase change)
                 pass
-            elif prev_phase == ExecutionPhase.RETREAT:
+            elif prev_phase == Phase.RETREAT:
                 # Already at retreat, no need to change
                 pass
             else:
                 # Was mid-operation, go to retreat phase for safety
-                self.ctx.current_phase = ExecutionPhase.RETREAT
+                self.ctx.current_phase = Phase.RETREAT
 
             self.ctx.mode = UIMode.PAUSE
             self.ui_manager.ui(
@@ -87,7 +105,7 @@ class TaskBrain(Node):
             )
             self._mode_before_safety_stop = None
 
-    def tick(self, source: str) -> None:
+    def tick(self, source: TickSource) -> None:
         """Delegate to pipeline orchestrator."""
         self.pipeline_orchestrator.tick(source)
 
@@ -114,6 +132,25 @@ class TaskBrain(Node):
     def start_execute_next_move(self) -> bool:
         """Start executing next move."""
         return self.action_executor.start_execute_next_move()
+
+    def callback_after_delay(self, delay_sec: float, callback: Callable) -> None:
+        """Invoke callback after a delay in seconds."""
+        # Cancel any previous EXEC_DONE timer
+        if self.exec_timer is not None:
+            self.exec_timer.cancel()
+            self.exec_timer = None
+
+        def timer_callback():
+            try:
+                callback()
+            except Exception as e:
+                self.get_logger().error(f"[exec] Error in delayed callback: {e}")
+            finally:
+                if self.exec_timer is not None:
+                    self.exec_timer.cancel()
+                    self.exec_timer = None
+
+        self.exec_timer = self.create_timer(delay_sec, timer_callback)
 
 
 def main() -> None:

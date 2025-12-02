@@ -2,11 +2,11 @@ arm_manipulator:
   ros__parameters:
     # tf_node
     use_dynamic_board_pose: true  # 启用从/board_pose话题更新位姿
-    # MoveIt planning parameters - Optimized for speed while maintaining quality
+    # MoveIt planning parameters - Optimized for safety and predictability
     planning_time: 10.0 # (s)
     num_planning_attempts: 5
-    max_velocity_scaling_factor: 0.5
-    max_acceleration_scaling_factor: 0.5
+    max_velocity_scaling_factor: 0.05
+    max_acceleration_scaling_factor: 0.05
     planner_id: "RRTConnectkConfigDefault"
 
     # Robot-specific parameters
@@ -20,7 +20,7 @@ arm_manipulator:
 
     # Calculated height offsets (in meters)
     approach_offset: 0.1     # Height above grip position for approach
-    retreat_offset: 0.200    # Height above grip position for retreat
+    retreat_offset: 0.3      # Height above grip position for retreat (needs to be high enough for camera recapture)
 
     # Board geometry (in meters)
     # SIM
@@ -48,12 +48,12 @@ arm_manipulator:
     joint_constraint_weight: 0.5     # Lower weight for additional constraints
 
     # Cartesian path planning parameters
-    cartesian_eef_step: 0.01          # End-effector step size for Cartesian paths (meters)
+    cartesian_eef_step: 0.005         # End-effector step size for Cartesian paths (meters) - smaller for smoother motion
     cartesian_jump_threshold: 0.0     # Jump threshold for Cartesian paths (0.0 = disabled)
-    cartesian_fraction_threshold: 0.8  # Minimum fraction of path that must be valid
+    cartesian_fraction_threshold: 0.95 # Minimum fraction of path that must be valid (high for safety)
 
     # Trajectory smoothing parameters
-    enable_trajectory_smoothing: false  # Disabled for faster planning
+    enable_trajectory_smoothing: true   # Enable for smoother motion
     replan_attempts: 2                   # Reduced for faster execution
 
     # Fast planning mode (prioritize speed over optimality)
