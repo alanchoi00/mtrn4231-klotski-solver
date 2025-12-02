@@ -3,6 +3,15 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROBOT_IP="${1:-192.168.0.100}"
 
+# Camera TF transform values (x y z qx qy qz qw) with defaults
+CAM_TX="${2:-1.30938}"
+CAM_TY="${3:-0.0206053}"
+CAM_TZ="${4:-0.670571}"
+CAM_QX="${5:--0.398486}"
+CAM_QY="${6:-0.00254305}"
+CAM_QZ="${7:-0.917119}"
+CAM_QW="${8:-0.00974536}"
+
 # helper: return 0 if a window with exactly this title exists, 1 otherwise
 window_exists() {
   local title="$1"
@@ -51,7 +60,7 @@ sleep 5
 if window_exists "$TITLE3"; then
   echo "Terminal with title \"$TITLE3\" already exists; skipping launch."
 else
-  gnome-terminal --title="$TITLE3" -- bash -lc "ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link; exec bash" &
+  gnome-terminal --title="$TITLE3" -- bash -lc "ros2 run tf2_ros static_transform_publisher $CAM_TX $CAM_TY $CAM_TZ $CAM_QX $CAM_QY $CAM_QZ $CAM_QW base_link camera_link; exec bash" &
 fi
 
 sleep 2
