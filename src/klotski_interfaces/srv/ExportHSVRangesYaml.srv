@@ -1,0 +1,7 @@
+# Request to export current HSV ranges as YAML string
+# Empty request - returns YAML formatted string of all HSV ranges
+---
+# Response with YAML string
+string yaml_content
+bool ok
+string message

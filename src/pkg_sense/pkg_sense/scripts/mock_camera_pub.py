@@ -14,7 +14,7 @@ class MockCameraPublisher(Node):
         super().__init__("mock_camera_publisher")
 
         # publish to the topic your Sense node expects:
-        topic = "/camera/camera/image_raw"
+        topic = "/camera/camera/color/image_raw"
         self.publisher = self.create_publisher(Image, topic, 10)
 
         self.bridge = CvBridge()

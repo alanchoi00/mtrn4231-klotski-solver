@@ -22,9 +22,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MoveList.msg"
   "msg/GripperCommand.msg"
   "msg/ContactState.msg"
+  "msg/HSVRange.msg"
+  "msg/HSVRanges.msg"
   "srv/SolveBoard.srv"
   "action/MovePiece.action"
   "srv/CaptureBoard.srv"
+  "srv/GetHSVRanges.srv"
+  "srv/SetHSVRanges.srv"
+  "srv/ExportHSVRangesYaml.srv"
+  "srv/ResetHSVRanges.srv"
   "action/GripPiece.action"
   DEPENDENCIES geometry_msgs builtin_interfaces
 )

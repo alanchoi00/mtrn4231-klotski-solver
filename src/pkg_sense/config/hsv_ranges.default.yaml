@@ -1,6 +1,6 @@
 red1:
   h_min: 0
-  h_max: 10
+  h_max: 15
   s_min: 100
   s_max: 255
   v_min: 80
@@ -33,4 +33,3 @@ blue:
   s_max: 255
   v_min: 0
   v_max: 255
-

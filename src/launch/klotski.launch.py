@@ -5,9 +5,10 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
+    OpaqueFunction,
     TimerAction,
 )
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -39,7 +40,7 @@ def generate_launch_description():
     """
     # Launch configurations
     start_rosbridge = LaunchConfiguration("start_rosbridge")
-    sim = LaunchConfiguration("sim")
+    web_video_server = LaunchConfiguration("web_video_server")
 
     # Klotski component launches
     manip_launch = PathJoinSubstitution(
@@ -61,9 +62,6 @@ def generate_launch_description():
     ur_moveit_launch = PathJoinSubstitution(
         [FindPackageShare("ur_moveit_config"), "launch", "ur_moveit.launch.py"]
     )
-    ur_moveit_launch = PathJoinSubstitution(
-        [FindPackageShare("ur_moveit_config"), "launch", "ur_moveit.launch.py"]
-    )
 
     return LaunchDescription(
         [
@@ -78,12 +76,33 @@ def generate_launch_description():
                 default_value="true",
                 description="Whether to start rosbridge websocket",
             ),
+            DeclareLaunchArgument(
+                "web_video_server",
+                default_value="true",
+                description="Whether to start web video server",
+            ),
+            DeclareLaunchArgument(
+                "robot_ip",
+                default_value="",
+                description="IP address of the real UR5e robot (required when sim:=false)",
+            ),
+            # Validate launch arguments
+            OpaqueFunction(function=validate_launch_args),
+            # ROS Bridge (optional)
             Node(
                 package="rosbridge_server",
                 executable="rosbridge_websocket",
                 name="rosbridge_websocket",
                 output="screen",
                 condition=IfCondition(start_rosbridge),
+            ),
+            # Web Video Server (optional)
+            Node(
+                package="web_video_server",
+                executable="web_video_server",
+                name="web_video_server",
+                output="screen",
+                condition=IfCondition(web_video_server),
             ),
             TimerAction(
                 period=3.0,
@@ -111,9 +130,6 @@ def generate_launch_description():
                     ),
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(sense_launch),
-                        condition=UnlessCondition(
-                            sim
-                        ),  # Only start sensing in real robot mode
                     ),
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(brain_launch),
