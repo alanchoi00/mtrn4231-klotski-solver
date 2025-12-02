@@ -334,17 +334,11 @@ bool ArmManipulator::execute_approach(
   feedback->progress = 0.5;
   goal_handle->publish_feedback(feedback);
 
-  // Try Cartesian path first for smoother motion
+  // Use Cartesian path only for predictable motion (no fallback to regular planning)
   bool success = planAndExecuteCartesianPath(target_pose, false);
 
   if (!success) {
-    RCLCPP_WARN(this->get_logger(),
-                "Cartesian planning failed, trying regular planning");
-    success = planAndExecuteSmoothedMotion(target_pose, false);
-  }
-
-  if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "All planning attempts failed");
+    RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed");
     RCLCPP_ERROR(this->get_logger(), "Current robot pose: (%.3f, %.3f, %.3f)",
                  move_group_interface_->getCurrentPose().pose.position.x,
                  move_group_interface_->getCurrentPose().pose.position.y,
@@ -375,14 +369,11 @@ bool ArmManipulator::execute_pick_place(
   feedback->progress = 0.3;
   goal_handle->publish_feedback(feedback);
 
-  // For vertical movements like pick/place, Cartesian path is ideal
+  // For vertical movements like pick/place, Cartesian path is required
   bool success = planAndExecuteCartesianPath(target_pose, true);
 
   if (!success) {
-    RCLCPP_WARN(
-        this->get_logger(),
-        "Cartesian planning failed for pick/place, trying regular planning");
-    success = planAndExecuteSmoothedMotion(target_pose, true);
+    RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed for pick/place");
   }
 
   feedback->progress = 0.6;
@@ -403,27 +394,69 @@ bool ArmManipulator::execute_retreat(
   goal_handle->publish_feedback(feedback);
 
   // Get current x, y position, but set new z height
-  geometry_msgs::msg::PoseStamped current_pose;
-  current_pose.header.frame_id = move_group_interface_->getPlanningFrame();
-  current_pose.pose = move_group_interface_->getCurrentPose().pose;
+  geometry_msgs::msg::PoseStamped target_pose;
+  target_pose.header.frame_id = move_group_interface_->getPlanningFrame();
+  target_pose.pose = move_group_interface_->getCurrentPose().pose;
 
-  current_pose.pose.position.z = retreat_height_;
+  target_pose.pose.position.z = retreat_height_;
 
   RCLCPP_INFO(this->get_logger(), "Target: (%.3f, %.3f, %.3f)",
-              current_pose.pose.position.x, current_pose.pose.position.y,
-              current_pose.pose.position.z);
+              target_pose.pose.position.x, target_pose.pose.position.y,
+              target_pose.pose.position.z);
 
   feedback->progress = 0.4;
   goal_handle->publish_feedback(feedback);
 
-  // For retreat (vertical movement), Cartesian path is ideal
-  bool success = planAndExecuteCartesianPath(current_pose, true);
+  // For retreat (vertical movement), use a more lenient Cartesian threshold
+  // since it's a simple vertical lift that may have minor IK deviations
+  std::vector<geometry_msgs::msg::Pose> waypoints;
+  waypoints.push_back(target_pose.pose);
+
+  moveit_msgs::msg::RobotTrajectory trajectory;
+  double fraction = move_group_interface_->computeCartesianPath(
+      waypoints, cartesian_eef_step_, cartesian_jump_threshold_, trajectory);
+
+  RCLCPP_INFO(this->get_logger(),
+              "Retreat Cartesian path: %.2f%% achieved", fraction * 100.0);
+
+  bool success = false;
+  // Use a lower threshold (0.8) for retreat since it's a simple vertical movement
+  // and we prioritize completing the retreat over perfect path accuracy
+  const double retreat_threshold = 0.8;
+  if (fraction >= retreat_threshold) {
+    // Apply time parameterization with velocity scaling
+    robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
+                                         move_group_interface_->getName());
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(), trajectory);
+
+    trajectory_processing::IterativeParabolicTimeParameterization iptp;
+    bool time_param_success = iptp.computeTimeStamps(
+        rt, max_velocity_scaling_factor_, max_acceleration_scaling_factor_);
+
+    if (time_param_success) {
+      rt.getRobotTrajectoryMsg(trajectory);
+    }
+
+    moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
+    cartesian_plan.trajectory_ = trajectory;
+
+    success = (move_group_interface_->execute(cartesian_plan) ==
+               moveit::core::MoveItErrorCode::SUCCESS);
+  } else {
+    RCLCPP_WARN(this->get_logger(),
+                "Cartesian retreat failed (%.2f%%), trying joint-space planning",
+                fraction * 100.0);
+    // Fallback to regular planning for retreat only - it's less critical than approach/pick_place
+    move_group_interface_->setPoseTarget(target_pose);
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    if (move_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS) {
+      success = (move_group_interface_->execute(plan) ==
+                 moveit::core::MoveItErrorCode::SUCCESS);
+    }
+  }
 
   if (!success) {
-    RCLCPP_WARN(
-        this->get_logger(),
-        "Cartesian planning failed for retreat, trying regular planning");
-    success = planAndExecuteSmoothedMotion(current_pose, true);
+    RCLCPP_ERROR(this->get_logger(), "Retreat planning failed");
   }
 
   feedback->progress = 0.7;
@@ -574,25 +607,10 @@ bool ArmManipulator::planAndExecuteCartesianPath(
   // Get current pose
   auto current_pose = move_group_interface_->getCurrentPose();
 
-  // Create waypoints for Cartesian path
+  // Create waypoints for strictly linear Cartesian path (no intermediate waypoints)
   std::vector<geometry_msgs::msg::Pose> waypoints;
 
-  // Add intermediate waypoint (optional for better path)
-  geometry_msgs::msg::Pose intermediate_pose = current_pose.pose;
-  intermediate_pose.position.z =
-      std::max(current_pose.pose.position.z, target_pose.pose.position.z) +
-      0.05;
-
-  // Only add intermediate waypoint if we're moving significantly
-  double distance =
-      sqrt(pow(target_pose.pose.position.x - current_pose.pose.position.x, 2) +
-           pow(target_pose.pose.position.y - current_pose.pose.position.y, 2));
-
-  if (distance > 0.1) {  // If moving more than 10cm horizontally
-    waypoints.push_back(intermediate_pose);
-  }
-
-  // Add final target
+  // Only add the final target - strict linear motion from current to target
   waypoints.push_back(target_pose.pose);
 
   // Set constraints if requested
@@ -613,6 +631,26 @@ bool ArmManipulator::planAndExecuteCartesianPath(
 
   bool success = false;
   if (fraction > cartesian_fraction_threshold_) {  // Use configurable threshold
+    // Apply time parameterization with velocity scaling to the Cartesian trajectory
+    robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
+                                         move_group_interface_->getName());
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(), trajectory);
+
+    // Apply velocity and acceleration scaling
+    trajectory_processing::IterativeParabolicTimeParameterization iptp;
+    bool time_param_success = iptp.computeTimeStamps(
+        rt, max_velocity_scaling_factor_, max_acceleration_scaling_factor_);
+
+    if (time_param_success) {
+      rt.getRobotTrajectoryMsg(trajectory);
+      RCLCPP_INFO(this->get_logger(), 
+                  "Applied velocity scaling (%.2f) to Cartesian trajectory",
+                  max_velocity_scaling_factor_);
+    } else {
+      RCLCPP_WARN(this->get_logger(),
+                  "Time parameterization failed, using original trajectory");
+    }
+
     // Execute the Cartesian trajectory
     moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
     cartesian_plan.trajectory_ = trajectory;
@@ -620,13 +658,11 @@ bool ArmManipulator::planAndExecuteCartesianPath(
     success = (move_group_interface_->execute(cartesian_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
   } else {
-    RCLCPP_WARN(this->get_logger(),
-                "Cartesian path planning failed (%.2f%%), falling back to "
-                "regular planning",
-                fraction * 100.0);
-
-    // Fall back to regular motion planning
-    success = planAndExecuteSmoothedMotion(target_pose, use_constraints);
+    RCLCPP_ERROR(this->get_logger(),
+                "Cartesian path planning failed (%.2f%% < %.2f%% threshold). "
+                "No fallback to regular planning.",
+                fraction * 100.0, cartesian_fraction_threshold_ * 100.0);
+    success = false;
   }
 
   // Clear constraints
