@@ -19,7 +19,7 @@ arm_manipulator:
     gripper_height: 0.191    # 191mm
 
     # Calculated height offsets (in meters)
-    approach_offset: 0.1     # Height above grip position for approach
+    approach_offset: 0.15     # Height above grip position for approach
     retreat_offset: 0.3      # Height above grip position for retreat (needs to be high enough for camera recapture)
 
     # Board geometry (in meters)

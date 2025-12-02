@@ -1,5 +1,7 @@
 "use client";
 
+import { TOPICS } from "@/lib/constants";
+
 interface MaskedImagePreviewProps {
   connected: boolean;
   imageError: boolean;
@@ -45,7 +47,7 @@ export const MaskedImagePreview: React.FC<MaskedImagePreviewProps> = ({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Topic: /sense/masked_image
+        Topic: {TOPICS.MASKED_IMAGE}
       </p>
     </div>
   );

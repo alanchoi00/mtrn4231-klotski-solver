@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  MESSAGE_TYPES,
+  SERVICES,
+  SERVICE_TYPES,
+  TOPICS,
+} from "@/lib/constants";
 import type {
   ExportHSVRangesYamlResponse,
   GetHSVRangesResponse,
@@ -34,8 +40,8 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
     return new Promise((resolve) => {
       const service = new ROSLIB.Service({
         ros,
-        name: "/sense/get_hsv_ranges",
-        serviceType: "klotski_interfaces/srv/GetHSVRanges",
+        name: SERVICES.GET_HSV_RANGES,
+        serviceType: SERVICE_TYPES.GET_HSV_RANGES,
       });
 
       const request = new ROSLIB.ServiceRequest({});
@@ -66,8 +72,8 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
     try {
       const topic = new ROSLIB.Topic({
         ros,
-        name: "/sense/hsv_ranges",
-        messageType: "klotski_interfaces/msg/HSVRanges",
+        name: TOPICS.HSV_RANGES,
+        messageType: MESSAGE_TYPES.HSV_RANGES,
       });
 
       const handleMessage = (message: unknown) => {
@@ -78,7 +84,7 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
       topic.subscribe(handleMessage);
       subscriptionRef.current = topic;
       setIsSubscribed(true);
-      console.log("Subscribed to /sense/hsv_ranges");
+      console.log(`Subscribed to ${TOPICS.HSV_RANGES}`);
 
       // Fetch initial values via service since we may have missed the initial publish
       setIsLoading(true);
@@ -89,13 +95,13 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
           topic.unsubscribe(handleMessage as (message: unknown) => void);
           subscriptionRef.current = null;
           setIsSubscribed(false);
-          console.log("Unsubscribed from /sense/hsv_ranges");
+          console.log(`Unsubscribed from ${TOPICS.HSV_RANGES}`);
         } catch (error) {
-          console.warn("Error unsubscribing from /sense/hsv_ranges:", error);
+          console.warn(`Error unsubscribing from ${TOPICS.HSV_RANGES}:`, error);
         }
       };
     } catch (error) {
-      console.error("Failed to subscribe to /sense/hsv_ranges:", error);
+      console.error(`Failed to subscribe to ${TOPICS.HSV_RANGES}:`, error);
       setIsSubscribed(false);
       return () => {};
     }
@@ -111,8 +117,8 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
       return new Promise((resolve) => {
         const service = new ROSLIB.Service({
           ros,
-          name: "/sense/set_hsv_ranges",
-          serviceType: "klotski_interfaces/srv/SetHSVRanges",
+          name: SERVICES.SET_HSV_RANGES,
+          serviceType: SERVICE_TYPES.SET_HSV_RANGES,
         });
 
         const request = new ROSLIB.ServiceRequest({ ranges });
@@ -146,8 +152,8 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
       return new Promise((resolve) => {
         const service = new ROSLIB.Service({
           ros,
-          name: "/sense/reset_hsv_ranges",
-          serviceType: "klotski_interfaces/srv/ResetHSVRanges",
+          name: SERVICES.RESET_HSV_RANGES,
+          serviceType: SERVICE_TYPES.RESET_HSV_RANGES,
         });
 
         const request = new ROSLIB.ServiceRequest({});
@@ -175,8 +181,8 @@ export const useHSVConfig = ({ ros }: UseHSVConfigOptions) => {
       return new Promise((resolve) => {
         const service = new ROSLIB.Service({
           ros,
-          name: "/sense/export_hsv_ranges_yaml",
-          serviceType: "klotski_interfaces/srv/ExportHSVRangesYaml",
+          name: SERVICES.EXPORT_HSV_RANGES_YAML,
+          serviceType: SERVICE_TYPES.EXPORT_HSV_RANGES_YAML,
         });
 
         const request = new ROSLIB.ServiceRequest({});

@@ -5,13 +5,14 @@ from typing import Callable, Optional
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
+from std_msgs.msg import Bool
 from rclpy.timer import Timer
 
 from klotski_interfaces.msg import BoardState
 
-from .context import BrainContext, TickSource
-from .managers import (ActionExecutor, PipelineOrchestrator, ServiceManager,
-                       UIManager)
+from .context import BrainContext, Phase, TickSource
+from .managers import ActionExecutor, PipelineOrchestrator, ServiceManager, UIManager
+from .ui_modes import UIMode
 
 
 class TaskBrain(Node):
@@ -34,15 +35,17 @@ class TaskBrain(Node):
             descriptor=ParameterDescriptor(
                 type=rclpy.Parameter.Type.DOUBLE.value,
                 description="Delay in seconds after move completion (retreat)",
-                read_only=False
-            )
+                read_only=False,
+            ),
         )
 
         # Initialize context
         self.ctx = BrainContext()
         self.exec_timer: Optional[Timer] = None
 
-        self.delay_secs: float = self.get_parameter("delay_secs").get_parameter_value().double_value
+        self.delay_secs: float = (
+            self.get_parameter("delay_secs").get_parameter_value().double_value
+        )
 
         # Initialize managers
         self.ui_manager = UIManager(self)
@@ -53,6 +56,12 @@ class TaskBrain(Node):
         # Set up board state subscription
         self.create_subscription(BoardState, "/board_state", self.on_board_state, 10)
 
+        # Set up safety stop subscription
+        self._safety_stop_active = False
+        self._mode_before_safety_stop: int | None = None
+        self._phase_before_safety_stop: Phase | None = None
+        self.create_subscription(Bool, "/safety/stop", self.on_safety_stop, 10)
+
         self.ui_manager.ui("TaskBrain up. Modes: auto | step | pause | reset")
 
     def on_board_state(self, state: BoardState) -> None:
@@ -61,6 +70,40 @@ class TaskBrain(Node):
         self.ui_manager.ui(f"BoardState received: {len(state.board.pieces)} pieces")
         # sensing updated -> invalidate plan to trigger replanning
         self.tick(TickSource.BOARD_STATE)
+
+    def on_safety_stop(self, msg: Bool) -> None:
+        """Handle safety stop signals from hand detection."""
+        stop_active = msg.data
+
+        if stop_active and not self._safety_stop_active:
+            self.ui_manager.ui("⚠️ SAFETY STOP: Hand detected - pausing operations")
+            # Safety stop triggered - save current mode/phase and pause
+            self._safety_stop_active = True
+            self._phase_before_safety_stop = self.ctx.current_phase
+            if self.ctx.mode != UIMode.PAUSE:
+                self._mode_before_safety_stop = self.ctx.mode
+                self.ctx.mode = UIMode.PAUSE
+        elif not stop_active and self._safety_stop_active:
+            # Safety stop cleared
+            self._safety_stop_active = False
+
+            # Determine which phase to resume at
+            prev_phase = self._phase_before_safety_stop
+            if prev_phase is None:
+                # Was None before, stay at None (no phase change)
+                pass
+            elif prev_phase == Phase.RETREAT:
+                # Already at retreat, no need to change
+                pass
+            else:
+                # Was mid-operation, go to retreat phase for safety
+                self.ctx.current_phase = Phase.RETREAT
+
+            self.ctx.mode = UIMode.PAUSE
+            self.ui_manager.ui(
+                f"✅ SAFETY CLEAR: Mode set to pause, ready to resume {self.ctx.current_phase.name} phase"
+            )
+            self._mode_before_safety_stop = None
 
     def tick(self, source: TickSource) -> None:
         """Delegate to pipeline orchestrator."""

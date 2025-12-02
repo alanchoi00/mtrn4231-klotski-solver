@@ -20,6 +20,21 @@ def generate_launch_description():
                     )
                 ],
             ),
+            Node(
+                package="pkg_sense",
+                executable="hand_safety_monitor",
+                name="hand_safety_monitor",
+                output="screen",
+                parameters=[
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare("pkg_sense"),
+                            "config",
+                            "hand_safety.config.yaml",
+                        ]
+                    )
+                ],
+            ),
             ExecuteProcess(
                 cmd=[
                     "ros2",

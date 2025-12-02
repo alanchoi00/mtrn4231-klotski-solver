@@ -11,7 +11,11 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         (
             f"share/{package_name}/config",
-            ["config/sense.config.yaml", "config/hsv_ranges.default.yaml"],
+            [
+                "config/sense.config.yaml",
+                "config/hsv_ranges.default.yaml",
+                "config/hand_safety.config.yaml",
+            ],
         ),
         (f"share/{package_name}/launch", ["launch/sense.launch.py"]),
         (f"share/{package_name}/test_images", ["test_images/klotski_test.jpg"]),
@@ -29,6 +33,7 @@ setup(
             "sense = pkg_sense.sense_node:main",
             "test_hsv_sense = pkg_sense.scripts.test_hsv_sense:main",
             "mock_camera_pub = pkg_sense.scripts.mock_camera_pub:main",
+            "hand_safety_monitor = pkg_sense.hand_safety_node:main",
         ],
     },
 )

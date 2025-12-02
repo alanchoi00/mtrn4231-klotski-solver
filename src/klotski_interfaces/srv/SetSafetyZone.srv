@@ -1,0 +1,16 @@
+# Service to set safety zone ROI points
+# Accepts 4 normalized (0-1) points defining the polygon
+
+# ROI points (normalized 0-1 coordinates)
+float64 p1_x
+float64 p1_y
+float64 p2_x
+float64 p2_y
+float64 p3_x
+float64 p3_y
+float64 p4_x
+float64 p4_y
+bool roi_enabled
+---
+bool success
+string message

@@ -1,15 +1,16 @@
 from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
+import cv2
 import cv2
 import numpy as np
 import pyrealsense2 as rs
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo, Image
 
-from ..services.colour_mask import build_colour_masks
-
 if TYPE_CHECKING:
     from ..sense_node import Sense
+    from .hsv_config_manager import HSVConfig
     from .hsv_config_manager import HSVConfig
 
 
@@ -31,6 +32,7 @@ class CameraManager:
         self.depth_image: Optional[np.ndarray] = None
         self.intrinsics: Optional[rs.intrinsics] = None  # rs.intrinsics
         self._hsv_config_getter = hsv_config_getter
+        self._hsv_config_getter = hsv_config_getter
 
         # Subscribers for camera topics
         self.image_sub_topic = "/camera/camera/color/image_raw"
@@ -50,11 +52,15 @@ class CameraManager:
         self.cells_overlay_image_pub_topic = "/sense/cells_overlay"
         self.rectified_board_image_pub_topic = "/sense/rectified_board"
         self.masked_image_pub_topic = "/sense/masked_image"
+        self.masked_image_pub_topic = "/sense/masked_image"
         self.cells_overlay_image_pub = self.node.create_publisher(
             Image, self.cells_overlay_image_pub_topic, 1
         )
         self.rectified_board_image_pub = self.node.create_publisher(
             Image, self.rectified_board_image_pub_topic, 1
+        )
+        self.masked_image_pub = self.node.create_publisher(
+            Image, self.masked_image_pub_topic, 1
         )
         self.masked_image_pub = self.node.create_publisher(
             Image, self.masked_image_pub_topic, 1
@@ -68,6 +74,9 @@ class CameraManager:
         )
         self.rectified_image_timer = self.node.create_timer(
             1.0, self.rectified_image_timer_callback
+        )
+        self.masked_image_timer = self.node.create_timer(
+            0.1, self.masked_image_timer_callback  # 10 Hz for live preview
         )
         self.masked_image_timer = self.node.create_timer(
             0.1, self.masked_image_timer_callback  # 10 Hz for live preview
@@ -160,6 +169,9 @@ class CameraManager:
         self, img: np.ndarray, hsv_config: "HSVConfig"
     ) -> np.ndarray:
         """Create a combined masked image showing all color detections."""
+        # Import here to avoid circular dependency
+        from ..services.colour_mask import build_colour_masks
+
         masks = build_colour_masks(img, hsv_config)
 
         # Create colored overlay image

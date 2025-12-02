@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROBOT_IP="${1:-192.168.0.100}"
+ROBOT_IP="192.168.0.100"
 
 # Camera TF transform values (x y z qx qy qz qw) with defaults
-CAM_TX="${2:-1.30938}"
-CAM_TY="${3:-0.0206053}"
-CAM_TZ="${4:-0.670571}"
-CAM_QX="${5:--0.398486}"
-CAM_QY="${6:-0.00254305}"
-CAM_QZ="${7:-0.917119}"
-CAM_QW="${8:-0.00974536}"
+CAM_TX="${1:-1.30938}"
+CAM_TY="${2:-0.0206053}"
+CAM_TZ="${3:-0.670571}"
+CAM_QX="${4:--0.398486}"
+CAM_QY="${5:-0.00254305}"
+CAM_QZ="${6:-0.917119}"
+CAM_QW="${7:-0.00974536}"
 
 # helper: return 0 if a window with exactly this title exists, 1 otherwise
 window_exists() {

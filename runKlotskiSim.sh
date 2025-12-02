@@ -29,6 +29,7 @@ window_exists() {
 
 TITLE1="UR5eDriverServer"
 TITLE2="Dashboard"
+TITLE3="CameraTF"
 
 if window_exists "$TITLE1"; then
   echo "Terminal with title \"$TITLE1\" already exists; skipping launch."
