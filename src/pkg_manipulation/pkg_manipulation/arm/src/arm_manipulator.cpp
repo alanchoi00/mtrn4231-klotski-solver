@@ -482,7 +482,8 @@ bool ArmManipulator::execute_retreat(
     moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
     cartesian_plan.trajectory_ = trajectory;
 
-    success = execute_with_safety_monitoring(cartesian_plan);
+    auto result = move_group_interface_->execute(cartesian_plan);
+    success = (result == moveit::core::MoveItErrorCode::SUCCESS);
   } else {
     RCLCPP_WARN(
         this->get_logger(),
@@ -494,7 +495,8 @@ bool ArmManipulator::execute_retreat(
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     if (move_group_interface_->plan(plan) ==
         moveit::core::MoveItErrorCode::SUCCESS) {
-      success = execute_with_safety_monitoring(plan);
+      auto result = move_group_interface_->execute(plan);
+      success = (result == moveit::core::MoveItErrorCode::SUCCESS);
     }
   }
 
@@ -701,7 +703,8 @@ bool ArmManipulator::planAndExecuteCartesianPath(
     moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
     cartesian_plan.trajectory_ = trajectory;
 
-    success = execute_with_safety_monitoring(cartesian_plan);
+    auto result = move_group_interface_->execute(cartesian_plan);
+    success = (result == moveit::core::MoveItErrorCode::SUCCESS);
   } else {
     RCLCPP_ERROR(this->get_logger(),
                  "Cartesian path planning failed (%.2f%% < %.2f%% threshold). "
@@ -760,7 +763,9 @@ bool ArmManipulator::planAndExecuteSmoothedMotion(
                   "Trajectory smoothing failed, using original trajectory");
     }
   }
-  success = execute_with_safety_monitoring(plan);
+
+  auto result = move_group_interface_->execute(plan);
+  success = (result == moveit::core::MoveItErrorCode::SUCCESS);
 
   // Clear constraints
   if (use_constraints) {
@@ -795,16 +800,12 @@ void ArmManipulator::safety_stop_callback(
   bool was_active = safety_stop_active_.exchange(msg->data);
 
   if (msg->data && !was_active) {
-    // Safety stop activated
+    // Safety stop activated - stop any ongoing motion immediately
     RCLCPP_ERROR(this->get_logger(),
-                 "🛑 EMERGENCY STOP: Safety stop activated - all arm motion "
-                 "will be halted");
+                 "🛑 EMERGENCY STOP: Safety stop activated - halting arm motion");
 
-    // Stop any ongoing motion immediately
     if (move_group_interface_) {
       move_group_interface_->stop();
-      RCLCPP_WARN(this->get_logger(),
-                  "⚠️ Stopped ongoing arm motion due to safety stop");
     }
   } else if (!msg->data && was_active) {
     // Safety stop cleared
@@ -812,53 +813,6 @@ void ArmManipulator::safety_stop_callback(
         this->get_logger(),
         "✅ SAFETY CLEAR: Emergency stop cleared - arm motion can resume");
   }
-}
-
-bool ArmManipulator::execute_with_safety_monitoring(
-    const moveit::planning_interface::MoveGroupInterface::Plan& plan) {
-  // Use a thread to monitor safety while executing
-  std::atomic<bool> execution_complete{false};
-  std::atomic<bool> execution_success{false};
-
-  // Start execution in a separate thread
-  std::thread execution_thread([this, &plan, &execution_complete,
-                                &execution_success]() {
-    auto result = move_group_interface_->execute(plan);
-    execution_success.store(result == moveit::core::MoveItErrorCode::SUCCESS);
-    execution_complete.store(true);
-  });
-
-  // Monitor for safety stops while execution is running
-  const auto check_interval =
-      std::chrono::milliseconds(50);  // Check every 50ms
-
-  while (!execution_complete.load()) {
-    // Check if safety stop was triggered during execution
-    if (safety_stop_active_.load()) {
-      RCLCPP_ERROR(
-          this->get_logger(),
-          "🛑 RUNTIME SAFETY STOP: Halting trajectory execution immediately");
-
-      // Stop the motion immediately
-      move_group_interface_->stop();
-
-      // Wait for the execution thread to complete
-      execution_thread.join();
-
-      return false;
-    }
-
-    // Allow other ROS callbacks to be processed
-    rclcpp::spin_some(this->shared_from_this());
-
-    // Sleep briefly to avoid busy waiting
-    std::this_thread::sleep_for(check_interval);
-  }
-
-  // Wait for the execution thread to complete
-  execution_thread.join();
-
-  return execution_success.load();
 }
 
 }  // namespace pkg_manipulation

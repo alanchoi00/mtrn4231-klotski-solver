@@ -257,14 +257,6 @@ class ArmManipulator : public rclcpp::Node {
    * clear)
    */
   void safety_stop_callback(const std_msgs::msg::Bool::SharedPtr msg);
-
-  /**
-   * @brief Executes trajectory with continuous safety monitoring
-   * @param plan The motion plan to execute
-   * @return true if successful, false if failed or stopped by safety
-   */
-  bool execute_with_safety_monitoring(
-      const moveit::planning_interface::MoveGroupInterface::Plan& plan);
 };
 
 }  // namespace pkg_manipulation
