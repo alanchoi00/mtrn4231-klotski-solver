@@ -76,13 +76,13 @@ class TaskBrain(Node):
         stop_active = msg.data
 
         if stop_active and not self._safety_stop_active:
+            self.ui_manager.ui("⚠️ SAFETY STOP: Hand detected - pausing operations")
             # Safety stop triggered - save current mode/phase and pause
             self._safety_stop_active = True
             self._phase_before_safety_stop = self.ctx.current_phase
             if self.ctx.mode != UIMode.PAUSE:
                 self._mode_before_safety_stop = self.ctx.mode
                 self.ctx.mode = UIMode.PAUSE
-                self.ui_manager.ui("⚠️ SAFETY STOP: Hand detected - pausing operations")
         elif not stop_active and self._safety_stop_active:
             # Safety stop cleared
             self._safety_stop_active = False
