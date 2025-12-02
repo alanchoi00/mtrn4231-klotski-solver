@@ -82,12 +82,9 @@ class TaskBrain(Node):
                 self.ctx.current_phase = ExecutionPhase.RETREAT
                 self.ui_manager.ui("🔄 Resuming at RETREAT phase for safety")
 
-            # Restore previous mode
-            if self._mode_before_safety_stop is not None:
-                self.ctx.mode = self._mode_before_safety_stop
-                mode_name = UIMode.to_string(self._mode_before_safety_stop)
-                self.ui_manager.ui(f"✅ SAFETY CLEAR: Mode restored to {mode_name}")
-                self._mode_before_safety_stop = None
+            self.ctx.mode = UIMode.PAUSE
+            self.ui_manager.ui(f"✅ SAFETY CLEAR: Mode set to pause")
+            self._mode_before_safety_stop = None
 
             self._phase_before_safety_stop = None
 
