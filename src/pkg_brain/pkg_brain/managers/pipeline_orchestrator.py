@@ -4,6 +4,7 @@ from typing import List
 
 from rclpy.node import Node
 
+from ..context import TickSource
 from ..handlers import (BaseHandler, ExecuteHandler, HandlerStatus,
                         PlanHandler, SenseHandler)
 from ..ui_modes import UIMode
@@ -16,7 +17,7 @@ class PipelineOrchestrator:
         self.node = node
         self.pipeline: List[BaseHandler] = [SenseHandler(), PlanHandler(), ExecuteHandler()]
 
-    def tick(self, source: str) -> None:
+    def tick(self, source: TickSource) -> None:
         """Execute the pipeline tick."""
         from ..task_brain import TaskBrain  # Avoid circular import
         brain = self.node

@@ -8,7 +8,7 @@ from launch.actions import (
     OpaqueFunction,
     TimerAction,
 )
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -35,14 +35,12 @@ def generate_launch_description():
     Usage:
     ```
     ros2 launch klotski.launch.py sim:=true start_rosbridge:=false
-    ros2 launch klotski.launch.py sim:=false robot_ip:=192.168.1.100
+    ros2 launch klotski.launch.py sim:=false
     ```
     """
     # Launch configurations
-    sim = LaunchConfiguration("sim")
     start_rosbridge = LaunchConfiguration("start_rosbridge")
     web_video_server = LaunchConfiguration("web_video_server")
-    robot_ip = LaunchConfiguration("robot_ip")
 
     # Klotski component launches
     manip_launch = PathJoinSubstitution(
@@ -59,11 +57,6 @@ def generate_launch_description():
 
     sense_launch = PathJoinSubstitution(
         [FindPackageShare("pkg_sense"), "launch", "sense.launch.py"]
-    )
-
-    # UR5e launches
-    ur_control_launch = PathJoinSubstitution(
-        [FindPackageShare("ur_robot_driver"), "launch", "ur_control.launch.py"]
     )
 
     ur_moveit_launch = PathJoinSubstitution(
@@ -111,32 +104,6 @@ def generate_launch_description():
                 output="screen",
                 condition=IfCondition(web_video_server),
             ),
-            # STEP 1: Start UR5e Robot Driver FIRST
-            # UR5e Robot Driver - Simulation
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(ur_control_launch),
-                launch_arguments={
-                    "ur_type": "ur5e",
-                    "robot_ip": "yyy.yyy.yyy.yyy",
-                    "initial_joint_controller": "joint_trajectory_controller",
-                    "use_fake_hardware": "true",
-                    "launch_rviz": "false",
-                }.items(),
-                condition=IfCondition(sim),
-            ),
-            # UR5e Robot Driver - Real Robot
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(ur_control_launch),
-                launch_arguments={
-                    "ur_type": "ur5e",
-                    "robot_ip": robot_ip,
-                    "use_fake_hardware": "false",
-                    "launch_rviz": "false",
-                }.items(),
-                condition=UnlessCondition(sim),
-            ),
-            # STEP 2: Start MoveIt after robot driver is ready
-            # MoveIt Configuration - 3 second delay to ensure robot driver is ready
             TimerAction(
                 period=3.0,
                 actions=[
@@ -152,7 +119,6 @@ def generate_launch_description():
                     ),
                 ],
             ),
-            # STEP 3: Start Klotski Components after MoveIt is ready
             TimerAction(
                 period=3.0,  # Wait 3 seconds for MoveIt to be ready
                 actions=[

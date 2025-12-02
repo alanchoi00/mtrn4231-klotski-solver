@@ -5,6 +5,7 @@ from std_msgs.msg import String
 
 from klotski_interfaces.msg import Board, UICommand
 
+from ..context import TickSource
 from ..ui_modes import UIMode
 
 
@@ -55,7 +56,7 @@ class UIManager:
         else:
             self.ui(f"UI: unknown mode '{cmd.mode}' (use auto|step|pause|reset)")
 
-        brain.tick("ui_cmd")
+        brain.tick(TickSource.UI_COMMAND)
 
     def on_goal(self, msg: Board) -> None:
         """Handle goal pattern updates."""
@@ -65,12 +66,11 @@ class UIManager:
             return
 
         brain.ctx.goal = msg
-        self.ui(f"Goal pattern received: {self._board_to_pattern(msg)}")
+        self.ui(f"Goal pattern received: {self.board_to_pattern(msg)}")
         brain.ctx.reset()
-        brain.ctx.plan_received = False
-        brain.tick("goal")
+        brain.tick(TickSource.GOAL_UPDATE)
 
-    def _board_to_pattern(self, board: Board) -> str:
+    def board_to_pattern(self, board: Board) -> str:
         """Convert a Board message to a pattern string for display."""
         W = board.spec.cols
         H = board.spec.rows
