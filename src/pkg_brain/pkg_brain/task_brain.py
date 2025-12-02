@@ -86,8 +86,6 @@ class TaskBrain(Node):
             self.ui_manager.ui(f"✅ SAFETY CLEAR: Mode set to pause")
             self._mode_before_safety_stop = None
 
-            self._phase_before_safety_stop = None
-
     def tick(self, source: str) -> None:
         """Delegate to pipeline orchestrator."""
         self.pipeline_orchestrator.tick(source)
