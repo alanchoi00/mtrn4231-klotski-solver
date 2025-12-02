@@ -24,8 +24,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ContactState.msg"
   "msg/HSVRange.msg"
   "msg/HSVRanges.msg"
-  "msg/HSVRange.msg"
-  "msg/HSVRanges.msg"
   "srv/SolveBoard.srv"
   "action/MovePiece.action"
   "srv/CaptureBoard.srv"
