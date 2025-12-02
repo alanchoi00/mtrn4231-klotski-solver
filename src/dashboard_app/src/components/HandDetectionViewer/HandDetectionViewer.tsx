@@ -251,7 +251,7 @@ export const HandDetectionViewer: React.FC<HandDetectionViewerProps> = ({
     <div
       ref={containerRef}
       className={`
-        fixed z-[100] flex flex-col overflow-hidden rounded-lg border
+        fixed z-40 flex flex-col overflow-hidden rounded-lg border
         bg-background shadow-2xl select-none
         ${isMaximized ? "inset-4" : ""}
         ${
