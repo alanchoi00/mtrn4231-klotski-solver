@@ -87,7 +87,7 @@ class HandSafetyNode(Node):
         # Subscriber for camera images
         self._image_sub = self.create_subscription(
             Image,
-            "/image_raw",
+            "/camera/camera/color/image_raw",
             self._image_callback,
             image_qos,
         )

@@ -18,7 +18,7 @@ export const TOPICS = {
   /** Annotated image with hand detection overlay */
   HAND_DETECTION_IMAGE: "/safety/hand_detection_image",
   /** Raw camera image without annotations */
-  RAW_IMAGE: "/camera/camera/colour/image_raw",
+  RAW_IMAGE: "/camera/camera/color/image_raw",
   /** Masked image for colour detection */
   MASKED_IMAGE: "/sense/masked_image",
   /** HSV ranges configuration */
