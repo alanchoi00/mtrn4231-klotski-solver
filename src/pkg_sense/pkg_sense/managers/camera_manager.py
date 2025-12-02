@@ -8,8 +8,6 @@ import pyrealsense2 as rs
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo, Image
 
-from ..services.colour_mask import build_colour_masks
-
 if TYPE_CHECKING:
     from ..sense_node import Sense
     from .hsv_config_manager import HSVConfig
@@ -21,12 +19,6 @@ class CameraManager:
     Manages camera subscriptions and image processing.
     """
 
-    def __init__(
-        self,
-        node: "Sense",
-        world_frame_id: str,
-        hsv_config_getter: Optional[Callable[[], "HSVConfig"]] = None,
-    ):
     def __init__(
         self,
         node: "Sense",
