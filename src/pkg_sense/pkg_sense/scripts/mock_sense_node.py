@@ -88,6 +88,9 @@ def rows_to_board(rows: List[str]) -> Board:
 
 class MockSense(Node):
     def __init__(self):
+        """
+        Usage: ros2 run pkg_sense mock_sense_node --ros-args -p mode:=rows -p rows:="3113/3113/.22./3443/3443" -p frame_id:=map
+        """
         super().__init__("mock_sense")
         self.ui_pub = self.create_publisher(String, "/ui/events", 10)
 
@@ -131,7 +134,6 @@ class MockSense(Node):
 
         state = BoardState()
         state.board = board
-        state.board_pose_map.header.frame_id = frame_id
         # (You can fill a fixed pose if useful; leaving zeros is fine for a mock)
 
         res.state = state
@@ -140,7 +142,9 @@ class MockSense(Node):
 
         # also publish on /board_state to help your existing brain flow
         self.state_pub.publish(state)
-        self._ui("SENSE: published /board_state (mock)")
+        self._ui(
+            f"(mock) SENSE: published /board_state (rows={[''.join(str(c) for c in r) for r in rows]})"
+        )
         return res
 
     def _ui(self, text: str):

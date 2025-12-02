@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 import rclpy
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
+from rclpy.timer import Timer
 
 from klotski_interfaces.msg import BoardState
 
-from .context import BrainContext
+from .context import BrainContext, TickSource
 from .managers import (ActionExecutor, PipelineOrchestrator, ServiceManager,
                        UIManager)
 
@@ -24,8 +28,21 @@ class TaskBrain(Node):
     def __init__(self):
         super().__init__("task_brain")
 
+        self.declare_parameter(
+            "delay_secs",
+            0.0,
+            descriptor=ParameterDescriptor(
+                type=rclpy.Parameter.Type.DOUBLE.value,
+                description="Delay in seconds after move completion (retreat)",
+                read_only=False
+            )
+        )
+
         # Initialize context
         self.ctx = BrainContext()
+        self.exec_timer: Optional[Timer] = None
+
+        self.delay_secs: float = self.get_parameter("delay_secs").get_parameter_value().double_value
 
         # Initialize managers
         self.ui_manager = UIManager(self)
@@ -43,10 +60,9 @@ class TaskBrain(Node):
         self.ctx.sensed = state
         self.ui_manager.ui(f"BoardState received: {len(state.board.pieces)} pieces")
         # sensing updated -> invalidate plan to trigger replanning
-        self.ctx.plan_received = False
-        self.tick("board_state")
+        self.tick(TickSource.BOARD_STATE)
 
-    def tick(self, source: str) -> None:
+    def tick(self, source: TickSource) -> None:
         """Delegate to pipeline orchestrator."""
         self.pipeline_orchestrator.tick(source)
 
@@ -73,6 +89,25 @@ class TaskBrain(Node):
     def start_execute_next_move(self) -> bool:
         """Start executing next move."""
         return self.action_executor.start_execute_next_move()
+
+    def callback_after_delay(self, delay_sec: float, callback: Callable) -> None:
+        """Invoke callback after a delay in seconds."""
+        # Cancel any previous EXEC_DONE timer
+        if self.exec_timer is not None:
+            self.exec_timer.cancel()
+            self.exec_timer = None
+
+        def timer_callback():
+            try:
+                callback()
+            except Exception as e:
+                self.get_logger().error(f"[exec] Error in delayed callback: {e}")
+            finally:
+                if self.exec_timer is not None:
+                    self.exec_timer.cancel()
+                    self.exec_timer = None
+
+        self.exec_timer = self.create_timer(delay_sec, timer_callback)
 
 
 def main() -> None:
