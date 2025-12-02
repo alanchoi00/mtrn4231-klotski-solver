@@ -23,6 +23,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "shape_msgs/msg/solid_primitive.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace pkg_manipulation {
 
@@ -239,12 +240,31 @@ class ArmManipulator : public rclcpp::Node {
       board_pose_sub_;
   bool use_dynamic_board_pose_;
 
+  // Safety stop tracking
+  std::atomic<bool> safety_stop_active_{false};
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+
   /**
    * @brief Callback for board state updates
    * @param msg BoardState message containing board pose (BL corner)
    */
   void board_state_callback(
       const klotski_interfaces::msg::BoardState::SharedPtr msg);
+
+  /**
+   * @brief Callback for safety stop signals
+   * @param msg Bool message indicating safety stop state (true = stop, false =
+   * clear)
+   */
+  void safety_stop_callback(const std_msgs::msg::Bool::SharedPtr msg);
+
+  /**
+   * @brief Executes trajectory with continuous safety monitoring
+   * @param plan The motion plan to execute
+   * @return true if successful, false if failed or stopped by safety
+   */
+  bool execute_with_safety_monitoring(
+      const moveit::planning_interface::MoveGroupInterface::Plan& plan);
 };
 
 }  // namespace pkg_manipulation

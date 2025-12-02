@@ -30,6 +30,14 @@ ArmManipulator::ArmManipulator() : Node("arm_manipulator") {
     RCLCPP_INFO(this->get_logger(), "Using static board pose from config file");
   }
 
+  // Safety stop subscription
+  safety_stop_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+      "/safety/stop", 10,
+      std::bind(&ArmManipulator::safety_stop_callback, this,
+                std::placeholders::_1));
+  RCLCPP_INFO(this->get_logger(),
+              "✓ Subscribed to /safety/stop for emergency stops");
+
   action_server_ = rclcpp_action::create_server<MoveAction>(
       this, "/arm_manipulation/move_piece",
       std::bind(&ArmManipulator::handle_goal, this, _1, _2),
@@ -214,6 +222,15 @@ void ArmManipulator::execute(
   auto feedback = std::make_shared<MoveAction::Feedback>();
   auto result = std::make_shared<MoveAction::Result>();
 
+  // Check safety stop at start of execution
+  if (safety_stop_active_.load()) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "🛑 Cannot execute move: Safety stop is active");
+    result->success = false;
+    goal_handle->abort(result);
+    return;
+  }
+
   uint8_t phase = goal->phase;
   auto piece_cells = goal->move.piece.cells;
   uint32_t target_col = goal->move.to_cell.col;
@@ -243,7 +260,7 @@ void ArmManipulator::execute(
 
       // First move to above
       success = execute_approach(goal_handle, feedback, piece_center_pose);
-      if (!success) break;
+      if (!success || safety_stop_active_.load()) break;
 
       // Then descend to piece center
       success = execute_pick_place(goal_handle, feedback, piece_center_pose);
@@ -278,7 +295,7 @@ void ArmManipulator::execute(
 
       // First move to above
       success = execute_approach(goal_handle, feedback, target_center_pose);
-      if (!success) break;
+      if (!success || safety_stop_active_.load()) break;
 
       // Then descend to target position
       success = execute_pick_place(goal_handle, feedback, target_center_pose);
@@ -286,6 +303,11 @@ void ArmManipulator::execute(
     }
 
     case MoveAction::Goal::PHASE_RETREAT:
+      // Check safety stop before retreat (always allow retreat for safety)
+      if (safety_stop_active_.load()) {
+        RCLCPP_WARN(this->get_logger(),
+                    "⚠️ RETREAT during safety stop - executing for safety");
+      }
       RCLCPP_INFO(this->get_logger(), "PHASE_RETREAT: Moving upward");
       success = execute_retreat(goal_handle, feedback);
       break;
@@ -309,7 +331,8 @@ bool ArmManipulator::execute_approach(
     const std::shared_ptr<GoalHandleMove> goal_handle,
     std::shared_ptr<MoveAction::Feedback> feedback,
     geometry_msgs::msg::PoseStamped target_pose) {
-  RCLCPP_INFO(this->get_logger(), "Moving to above target (APPROACH height)");
+  RCLCPP_INFO(this->get_logger(),
+              "Moving to approach position (APPROACH height)");
 
   feedback->progress = 0.1;
   goal_handle->publish_feedback(feedback);
@@ -334,7 +357,15 @@ bool ArmManipulator::execute_approach(
   feedback->progress = 0.5;
   goal_handle->publish_feedback(feedback);
 
-  // Use Cartesian path only for predictable motion (no fallback to regular planning)
+  // Final safety check before executing motion
+  if (safety_stop_active_.load()) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "🛑 Approach motion aborted: Safety stop active");
+    return false;
+  }
+
+  // Use Cartesian path only for predictable motion (no fallback to regular
+  // planning)
   bool success = planAndExecuteCartesianPath(target_pose, false);
 
   if (!success) {
@@ -355,7 +386,8 @@ bool ArmManipulator::execute_pick_place(
     const std::shared_ptr<GoalHandleMove> goal_handle,
     std::shared_ptr<MoveAction::Feedback> feedback,
     geometry_msgs::msg::PoseStamped target_pose) {
-  RCLCPP_INFO(this->get_logger(), "Descending to grip height (GRIP height)");
+  RCLCPP_INFO(this->get_logger(),
+              "Moving to pick/place position (GRIP height)");
 
   feedback->progress = 0.1;
   goal_handle->publish_feedback(feedback);
@@ -369,11 +401,19 @@ bool ArmManipulator::execute_pick_place(
   feedback->progress = 0.3;
   goal_handle->publish_feedback(feedback);
 
+  // Final safety check before executing motion
+  if (safety_stop_active_.load()) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "🛑 Pick/place motion aborted: Safety stop active");
+    return false;
+  }
+
   // For vertical movements like pick/place, Cartesian path is required
   bool success = planAndExecuteCartesianPath(target_pose, true);
 
   if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed for pick/place");
+    RCLCPP_ERROR(this->get_logger(),
+                 "Cartesian planning failed for pick/place");
   }
 
   feedback->progress = 0.6;
@@ -416,18 +456,20 @@ bool ArmManipulator::execute_retreat(
   double fraction = move_group_interface_->computeCartesianPath(
       waypoints, cartesian_eef_step_, cartesian_jump_threshold_, trajectory);
 
-  RCLCPP_INFO(this->get_logger(),
-              "Retreat Cartesian path: %.2f%% achieved", fraction * 100.0);
+  RCLCPP_INFO(this->get_logger(), "Retreat Cartesian path: %.2f%% achieved",
+              fraction * 100.0);
 
   bool success = false;
-  // Use a lower threshold (0.8) for retreat since it's a simple vertical movement
-  // and we prioritize completing the retreat over perfect path accuracy
+  // Use a lower threshold (0.8) for retreat since it's a simple vertical
+  // movement and we prioritize completing the retreat over perfect path
+  // accuracy
   const double retreat_threshold = 0.8;
   if (fraction >= retreat_threshold) {
     // Apply time parameterization with velocity scaling
     robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
                                          move_group_interface_->getName());
-    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(), trajectory);
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(),
+                             trajectory);
 
     trajectory_processing::IterativeParabolicTimeParameterization iptp;
     bool time_param_success = iptp.computeTimeStamps(
@@ -440,18 +482,19 @@ bool ArmManipulator::execute_retreat(
     moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
     cartesian_plan.trajectory_ = trajectory;
 
-    success = (move_group_interface_->execute(cartesian_plan) ==
-               moveit::core::MoveItErrorCode::SUCCESS);
+    success = execute_with_safety_monitoring(cartesian_plan);
   } else {
-    RCLCPP_WARN(this->get_logger(),
-                "Cartesian retreat failed (%.2f%%), trying joint-space planning",
-                fraction * 100.0);
-    // Fallback to regular planning for retreat only - it's less critical than approach/pick_place
+    RCLCPP_WARN(
+        this->get_logger(),
+        "Cartesian retreat failed (%.2f%%), trying joint-space planning",
+        fraction * 100.0);
+    // Fallback to regular planning for retreat only - it's less critical than
+    // approach/pick_place
     move_group_interface_->setPoseTarget(target_pose);
     moveit::planning_interface::MoveGroupInterface::Plan plan;
-    if (move_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS) {
-      success = (move_group_interface_->execute(plan) ==
-                 moveit::core::MoveItErrorCode::SUCCESS);
+    if (move_group_interface_->plan(plan) ==
+        moveit::core::MoveItErrorCode::SUCCESS) {
+      success = execute_with_safety_monitoring(plan);
     }
   }
 
@@ -607,7 +650,8 @@ bool ArmManipulator::planAndExecuteCartesianPath(
   // Get current pose
   auto current_pose = move_group_interface_->getCurrentPose();
 
-  // Create waypoints for strictly linear Cartesian path (no intermediate waypoints)
+  // Create waypoints for strictly linear Cartesian path (no intermediate
+  // waypoints)
   std::vector<geometry_msgs::msg::Pose> waypoints;
 
   // Only add the final target - strict linear motion from current to target
@@ -631,10 +675,12 @@ bool ArmManipulator::planAndExecuteCartesianPath(
 
   bool success = false;
   if (fraction > cartesian_fraction_threshold_) {  // Use configurable threshold
-    // Apply time parameterization with velocity scaling to the Cartesian trajectory
+    // Apply time parameterization with velocity scaling to the Cartesian
+    // trajectory
     robot_trajectory::RobotTrajectory rt(move_group_interface_->getRobotModel(),
                                          move_group_interface_->getName());
-    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(), trajectory);
+    rt.setRobotTrajectoryMsg(*move_group_interface_->getCurrentState(),
+                             trajectory);
 
     // Apply velocity and acceleration scaling
     trajectory_processing::IterativeParabolicTimeParameterization iptp;
@@ -643,7 +689,7 @@ bool ArmManipulator::planAndExecuteCartesianPath(
 
     if (time_param_success) {
       rt.getRobotTrajectoryMsg(trajectory);
-      RCLCPP_INFO(this->get_logger(), 
+      RCLCPP_INFO(this->get_logger(),
                   "Applied velocity scaling (%.2f) to Cartesian trajectory",
                   max_velocity_scaling_factor_);
     } else {
@@ -655,13 +701,12 @@ bool ArmManipulator::planAndExecuteCartesianPath(
     moveit::planning_interface::MoveGroupInterface::Plan cartesian_plan;
     cartesian_plan.trajectory_ = trajectory;
 
-    success = (move_group_interface_->execute(cartesian_plan) ==
-               moveit::core::MoveItErrorCode::SUCCESS);
+    success = execute_with_safety_monitoring(cartesian_plan);
   } else {
     RCLCPP_ERROR(this->get_logger(),
-                "Cartesian path planning failed (%.2f%% < %.2f%% threshold). "
-                "No fallback to regular planning.",
-                fraction * 100.0, cartesian_fraction_threshold_ * 100.0);
+                 "Cartesian path planning failed (%.2f%% < %.2f%% threshold). "
+                 "No fallback to regular planning.",
+                 fraction * 100.0, cartesian_fraction_threshold_ * 100.0);
     success = false;
   }
 
@@ -715,8 +760,7 @@ bool ArmManipulator::planAndExecuteSmoothedMotion(
                   "Trajectory smoothing failed, using original trajectory");
     }
   }
-  success = (move_group_interface_->execute(plan) ==
-             moveit::core::MoveItErrorCode::SUCCESS);
+  success = execute_with_safety_monitoring(plan);
 
   // Clear constraints
   if (use_constraints) {
@@ -744,6 +788,77 @@ void ArmManipulator::board_state_callback(
   RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                        "Board origin (BL corner): pos=(%.3f,%.3f), yaw=%.1f°",
                        board_origin_x_, board_origin_y_, yaw * 180.0 / M_PI);
+}
+
+void ArmManipulator::safety_stop_callback(
+    const std_msgs::msg::Bool::SharedPtr msg) {
+  bool was_active = safety_stop_active_.exchange(msg->data);
+
+  if (msg->data && !was_active) {
+    // Safety stop activated
+    RCLCPP_ERROR(this->get_logger(),
+                 "🛑 EMERGENCY STOP: Safety stop activated - all arm motion "
+                 "will be halted");
+
+    // Stop any ongoing motion immediately
+    if (move_group_interface_) {
+      move_group_interface_->stop();
+      RCLCPP_WARN(this->get_logger(),
+                  "⚠️ Stopped ongoing arm motion due to safety stop");
+    }
+  } else if (!msg->data && was_active) {
+    // Safety stop cleared
+    RCLCPP_INFO(
+        this->get_logger(),
+        "✅ SAFETY CLEAR: Emergency stop cleared - arm motion can resume");
+  }
+}
+
+bool ArmManipulator::execute_with_safety_monitoring(
+    const moveit::planning_interface::MoveGroupInterface::Plan& plan) {
+  // Use a thread to monitor safety while executing
+  std::atomic<bool> execution_complete{false};
+  std::atomic<bool> execution_success{false};
+
+  // Start execution in a separate thread
+  std::thread execution_thread([this, &plan, &execution_complete,
+                                &execution_success]() {
+    auto result = move_group_interface_->execute(plan);
+    execution_success.store(result == moveit::core::MoveItErrorCode::SUCCESS);
+    execution_complete.store(true);
+  });
+
+  // Monitor for safety stops while execution is running
+  const auto check_interval =
+      std::chrono::milliseconds(50);  // Check every 50ms
+
+  while (!execution_complete.load()) {
+    // Check if safety stop was triggered during execution
+    if (safety_stop_active_.load()) {
+      RCLCPP_ERROR(
+          this->get_logger(),
+          "🛑 RUNTIME SAFETY STOP: Halting trajectory execution immediately");
+
+      // Stop the motion immediately
+      move_group_interface_->stop();
+
+      // Wait for the execution thread to complete
+      execution_thread.join();
+
+      return false;
+    }
+
+    // Allow other ROS callbacks to be processed
+    rclcpp::spin_some(this->shared_from_this());
+
+    // Sleep briefly to avoid busy waiting
+    std::this_thread::sleep_for(check_interval);
+  }
+
+  // Wait for the execution thread to complete
+  execution_thread.join();
+
+  return execution_success.load();
 }
 
 }  // namespace pkg_manipulation
