@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<robot name="parallel_gripper">
+
+  <!-- Base body -->
+  <link name="gripper_base">
+    <visual>
+      <geometry>
+        <box size="0.072 0.05 0.119"/> <!-- width, depth, height -->
+      </geometry>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <material name="grey">
+        <color rgba="0.6 0.6 0.6 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.116" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.072 0.06 0.23"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <inertia ixx="0.0001" ixy="0.0" ixz="0.0"
+               iyy="0.0001" iyz="0.0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <!-- Left finger -->
+  <link name="left_finger">
+    <visual>
+      <origin xyz="0.003 -0.024 0.149" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.003 0.02 0.07"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0.2 0.2 1.0 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Right finger -->
+  <link name="right_finger">
+    <visual>
+      <origin xyz="-0.003 -0.024 0.149" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.003 0.02 0.07"/>
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Left finger slides along +Y -->
+  <joint name="left_finger_slide" type="prismatic">
+    <parent link="gripper_base"/>
+    <child link="left_finger"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0" upper="0.02" effort="5" velocity="0.1"/>
+  </joint>
+
+  <!-- Right finger slides along -Y -->
+  <joint name="right_finger_slide" type="prismatic">
+    <parent link="gripper_base"/>
+    <child link="right_finger"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="0" upper="0.02" effort="5" velocity="0.1"/>
+  </joint>
+
+</robot>

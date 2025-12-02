@@ -1,0 +1,4 @@
+klotski_interfaces/HSVRanges ranges
+---
+bool ok
+string message

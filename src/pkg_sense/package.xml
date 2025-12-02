@@ -5,15 +5,15 @@
   <version>0.0.0</version>
   <description>Klotski sensing node</description>
   <maintainer email="alanchoi.uni@gmail.com">mtrn</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>klotski_interfaces</exec_depend>
+  <exec_depend>klotski_utils</exec_depend>
 
-  <!-- TF and helpers -->
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>
 
@@ -21,6 +21,7 @@
 
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>pyrealsense2</exec_depend>
+  <exec_depend>dataclass-wizard</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
