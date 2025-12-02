@@ -5,7 +5,6 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    OpaqueFunction,
     TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
@@ -35,13 +34,12 @@ def generate_launch_description():
     Usage:
     ```
     ros2 launch klotski.launch.py sim:=true start_rosbridge:=false
-    ros2 launch klotski.launch.py sim:=false robot_ip:=192.168.1.100
+    ros2 launch klotski.launch.py sim:=false
     ```
     """
     # Launch configurations
-    sim = LaunchConfiguration("sim")
     start_rosbridge = LaunchConfiguration("start_rosbridge")
-    robot_ip = LaunchConfiguration("robot_ip")
+    sim = LaunchConfiguration("sim")
 
     # Klotski component launches
     manip_launch = PathJoinSubstitution(
@@ -58,11 +56,6 @@ def generate_launch_description():
 
     sense_launch = PathJoinSubstitution(
         [FindPackageShare("pkg_sense"), "launch", "sense.launch.py"]
-    )
-
-    # UR5e launches
-    ur_control_launch = PathJoinSubstitution(
-        [FindPackageShare("ur_robot_driver"), "launch", "ur_control.launch.py"]
     )
 
     ur_moveit_launch = PathJoinSubstitution(
@@ -82,14 +75,6 @@ def generate_launch_description():
                 default_value="true",
                 description="Whether to start rosbridge websocket",
             ),
-            DeclareLaunchArgument(
-                "robot_ip",
-                default_value="",
-                description="IP address of the real UR5e robot (required when sim:=false)",
-            ),
-            # Validate launch arguments
-            OpaqueFunction(function=validate_launch_args),
-            # ROS Bridge (optional)
             Node(
                 package="rosbridge_server",
                 executable="rosbridge_websocket",
@@ -97,34 +82,8 @@ def generate_launch_description():
                 output="screen",
                 condition=IfCondition(start_rosbridge),
             ),
-            # STEP 1: Start UR5e Robot Driver FIRST
-            # UR5e Robot Driver - Simulation
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(ur_control_launch),
-                launch_arguments={
-                    "ur_type": "ur5e",
-                    "robot_ip": "yyy.yyy.yyy.yyy",
-                    "initial_joint_controller": "joint_trajectory_controller",
-                    "use_fake_hardware": "true",
-                    "launch_rviz": "false",
-                }.items(),
-                condition=IfCondition(sim),
-            ),
-            # UR5e Robot Driver - Real Robot
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(ur_control_launch),
-                launch_arguments={
-                    "ur_type": "ur5e",
-                    "robot_ip": robot_ip,
-                    "use_fake_hardware": "false",
-                    "launch_rviz": "false",
-                }.items(),
-                condition=UnlessCondition(sim),
-            ),
-            # STEP 2: Start MoveIt after robot driver is ready
-            # MoveIt Configuration - 10 second delay to ensure robot driver is ready
             TimerAction(
-                period=10.0,
+                period=3.0,
                 actions=[
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(ur_moveit_launch),
@@ -138,9 +97,8 @@ def generate_launch_description():
                     ),
                 ],
             ),
-            # STEP 3: Start Klotski Components after MoveIt is ready
             TimerAction(
-                period=15.0,  # Wait 15 seconds for MoveIt to be ready
+                period=3.0,  # Wait 3 seconds for MoveIt to be ready
                 actions=[
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(manip_launch),
@@ -150,12 +108,12 @@ def generate_launch_description():
                     ),
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(sense_launch),
+                        condition=UnlessCondition(
+                            sim
+                        ),  # Only start sensing in real robot mode
                     ),
                     IncludeLaunchDescription(
                         PythonLaunchDescriptionSource(brain_launch),
-                    ),
-                    IncludeLaunchDescription(
-                        PythonLaunchDescriptionSource(sense_launch),
                     ),
                 ],
             ),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..context import BrainContext, ExecutionPhase
+from ..context import BrainContext, Phase
 from ..ui_modes import UIMode
 from .base import BaseHandler, BrainNodeLike, HandlerResult
 from .status import HandlerResult, HandlerStatus
@@ -9,9 +9,12 @@ from .status import HandlerResult, HandlerStatus
 class ExecuteHandler(BaseHandler):
     name = "execute"
 
-    def handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
+    def do_handle(self, ctx: BrainContext, node: BrainNodeLike) -> HandlerResult:
+        if Phase.is_pre_execution_phase(ctx.current_phase):
+            return HandlerResult(HandlerStatus.NEXT, f"not execution phase (current_phase={ctx.current_phase})")
+
         # Only execute if we have received a plan
-        if not ctx.plan_received:
+        if ctx.plan is None or len(ctx.plan) == 0:
             return HandlerResult(HandlerStatus.DONE, "no plan")
 
         if ctx.plan_index >= len(ctx.plan):
@@ -29,26 +32,26 @@ class ExecuteHandler(BaseHandler):
 
         # STEP mode: run exactly one phase and then pause
         if ctx.mode == UIMode.STEP:
-            current_phase_name = ExecutionPhase.get_name(ctx.current_phase)
+            current_phase_name = Phase.get_name(ctx.current_phase)
             node.debug(f"[exec] STEP: executing {current_phase_name} phase")
             if node.start_execute_next_move():
                 return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
             else:
                 node.ui(f"[exec] manipulation not implemented; skipping phase {current_phase_name}")
                 # emulate "done one phase" even if not implemented:
-                next_phase = ExecutionPhase.next_phase(ctx.current_phase)
+                next_phase = Phase.next_phase(ctx.current_phase)
                 if next_phase is not None:
                     ctx.current_phase = next_phase
                 else:
                     # All phases complete for this move
                     ctx.plan_index += 1
-                    ctx.current_phase = ExecutionPhase.APPROACH
+                    ctx.current_phase = Phase.get_start_phase()
                 ctx.mode = UIMode.PAUSE
                 return HandlerResult(HandlerStatus.DONE, "skipped one phase (not implemented)")
 
         # AUTO mode: run next phase; result callback will trigger next tick
         if ctx.mode == UIMode.AUTO:
-            current_phase_name = ExecutionPhase.get_name(ctx.current_phase)
+            current_phase_name = Phase.get_name(ctx.current_phase)
             node.debug(f"[exec] AUTO: executing {current_phase_name} phase")
             if node.start_execute_next_move():
                 return HandlerResult(HandlerStatus.PENDING, f"executing {current_phase_name} phase")
