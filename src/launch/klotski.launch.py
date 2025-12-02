@@ -61,6 +61,9 @@ def generate_launch_description():
     ur_moveit_launch = PathJoinSubstitution(
         [FindPackageShare("ur_moveit_config"), "launch", "ur_moveit.launch.py"]
     )
+    ur_moveit_launch = PathJoinSubstitution(
+        [FindPackageShare("ur_moveit_config"), "launch", "ur_moveit.launch.py"]
+    )
 
     return LaunchDescription(
         [

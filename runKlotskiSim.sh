@@ -46,6 +46,14 @@ fi
 
 sleep 5
 
+if window_exists "$TITLE3"; then
+  echo "Terminal with title \"$TITLE3\" already exists; skipping launch."
+else
+  gnome-terminal --title="$TITLE3" -- bash -lc "ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link; exec bash" &
+fi
+
+sleep 2
+
 source "$SCRIPT_DIR/install/setup.bash"
 
 ros2 launch src/launch/klotski.launch.py sim:=true
