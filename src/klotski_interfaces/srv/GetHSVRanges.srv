@@ -1,0 +1,7 @@
+# Request to get current HSV ranges
+# Empty request - returns all current HSV ranges
+---
+# Response with current HSV configuration
+klotski_interfaces/HSVRanges ranges
+bool ok
+string message

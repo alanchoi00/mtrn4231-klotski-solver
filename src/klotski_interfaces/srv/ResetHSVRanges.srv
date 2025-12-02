@@ -1,0 +1,7 @@
+# Request to reset HSV ranges to values from YAML config file
+# Empty request - reloads from the original config file
+---
+# Response after reset
+klotski_interfaces/HSVRanges ranges   # The reset HSV ranges
+bool ok
+string message

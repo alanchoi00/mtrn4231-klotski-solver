@@ -10,6 +10,7 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "klotski_interfaces/action/move_piece.hpp"
+#include "klotski_interfaces/msg/board_state.hpp"
 #include "klotski_interfaces/msg/cell.hpp"
 #include "klotski_interfaces/msg/piece.hpp"
 #include "moveit/move_group_interface/move_group_interface.h"
@@ -22,6 +23,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "shape_msgs/msg/solid_primitive.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace pkg_manipulation {
 
@@ -72,8 +74,8 @@ class ArmManipulator : public rclcpp::Node {
   std::string robot_ip_;
 
   // Board geometry parameters
-  double board_center_x_;
-  double board_center_y_;
+  double board_origin_x_;  // Bottom-left corner (cell 0,0) X position
+  double board_origin_y_;  // Bottom-left corner (cell 0,0) Y position
   double board_width_;
   double board_length_;
   double cell_size_;
@@ -232,14 +234,29 @@ class ArmManipulator : public rclcpp::Node {
       const geometry_msgs::msg::PoseStamped& target_pose,
       bool use_constraints = false);
 
-  /*tf_node*/
+  // Dynamic board pose tracking
   double board_rotation_yaw_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr
+  rclcpp::Subscription<klotski_interfaces::msg::BoardState>::SharedPtr
       board_pose_sub_;
   bool use_dynamic_board_pose_;
 
-  void board_pose_callback(
-      const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  // Safety stop tracking
+  std::atomic<bool> safety_stop_active_{false};
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+
+  /**
+   * @brief Callback for board state updates
+   * @param msg BoardState message containing board pose (BL corner)
+   */
+  void board_state_callback(
+      const klotski_interfaces::msg::BoardState::SharedPtr msg);
+
+  /**
+   * @brief Callback for safety stop signals
+   * @param msg Bool message indicating safety stop state (true = stop, false =
+   * clear)
+   */
+  void safety_stop_callback(const std_msgs::msg::Bool::SharedPtr msg);
 };
 
 }  // namespace pkg_manipulation
