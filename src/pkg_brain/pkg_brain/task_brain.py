@@ -80,10 +80,11 @@ class TaskBrain(Node):
             else:
                 # Was mid-operation, go to retreat phase for safety
                 self.ctx.current_phase = ExecutionPhase.RETREAT
-                self.ui_manager.ui("🔄 Resuming at RETREAT phase for safety")
 
             self.ctx.mode = UIMode.PAUSE
-            self.ui_manager.ui(f"✅ SAFETY CLEAR: Mode set to pause")
+            self.ui_manager.ui(
+                f"✅ SAFETY CLEAR: Mode set to pause, ready to resume {self.ctx.current_phase.name} phase"
+            )
             self._mode_before_safety_stop = None
 
     def tick(self, source: str) -> None:
