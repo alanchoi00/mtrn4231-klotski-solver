@@ -7,6 +7,7 @@ from klotski_utils import declare_param
 
 from .handlers import CaptureBoardHandler
 from .managers import (
+    ArucoOffsetsManager,
     CameraManager,
     HSVConfigManager,
     BoardStateManager,
@@ -181,6 +182,15 @@ class Sense(Node):
             aruco_offset_y_m=aruco_offset_y,
             aruco_offset_z_m=aruco_offset_z,
             board_rotation_offset_deg=board_rotation_offset_deg,
+        )
+
+        # ArUco offsets manager for runtime adjustment via UI
+        self.aruco_offsets_manager = ArucoOffsetsManager(
+            self,
+            transformation_manager=self.transformation_manager,
+            initial_x=aruco_offset_x,
+            initial_y=aruco_offset_y,
+            initial_z=aruco_offset_z,
         )
 
         self.capture_board_handler = CaptureBoardHandler(

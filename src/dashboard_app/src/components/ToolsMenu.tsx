@@ -7,8 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Grid3X3, Hand, Menu, Palette } from "lucide-react";
+import { Crosshair, Grid3X3, Hand, Menu, Palette } from "lucide-react";
 import { useState } from "react";
+import { ArucoOffsetsSheet } from "./ArucoOffsets/ArucoOffsetsSheet";
 import { ColourMaskerSheet } from "./ColourMasker/ColourMaskerSheet";
 import { GoalEditorSheet } from "./GoalEditor/GoalEditorSheet";
 import { HandDetectionViewer } from "./HandDetectionViewer";
@@ -17,6 +18,7 @@ export const ToolsMenu: React.FC = () => {
   const [isColourMaskerOpen, setIsColourMaskerOpen] = useState(false);
   const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
   const [isHandDetectionOpen, setIsHandDetectionOpen] = useState(false);
+  const [isArucoOffsetsOpen, setIsArucoOffsetsOpen] = useState(false);
 
   return (
     <>
@@ -42,6 +44,10 @@ export const ToolsMenu: React.FC = () => {
             <Hand className="mr-2 h-4 w-4" />
             Hand Detection
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsArucoOffsetsOpen(true)}>
+            <Crosshair className="mr-2 h-4 w-4" />
+            ArUco Offsets
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -58,6 +64,11 @@ export const ToolsMenu: React.FC = () => {
       <HandDetectionViewer
         open={isHandDetectionOpen}
         onClose={() => setIsHandDetectionOpen(false)}
+      />
+
+      <ArucoOffsetsSheet
+        open={isArucoOffsetsOpen}
+        onOpenChange={setIsArucoOffsetsOpen}
       />
     </>
   );

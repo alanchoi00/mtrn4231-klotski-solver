@@ -86,16 +86,16 @@ def compute_marker_pose_from_depth(
 ) -> Optional[tuple[np.ndarray, List[float]]]:
     """
     Compute marker pose (position and orientation) using depth camera.
-    
+
     Uses the depth camera to get 3D positions of marker corners, then
     computes orientation from the corner positions.
-    
+
     Args:
         corners: 4x2 array of marker corner pixel coordinates
         depth_image: Depth image from RealSense
         intrinsics: Camera intrinsics
         marker_length_m: Physical marker side length in meters
-        
+
     Returns:
         Tuple of (position [3], quaternion [x,y,z,w]) or None if failed
     """
@@ -110,43 +110,43 @@ def compute_marker_pose_from_depth(
         if pt is None:
             return None
         corner_points_3d.append(pt)
-    
+
     corner_points_3d = np.array(corner_points_3d)  # shape (4, 3)
-    
+
     # Marker center is average of 4 corners
     center_3d = np.mean(corner_points_3d, axis=0)
-    
+
     # Compute orientation from corner positions
     # ArUco corners are ordered: TL, TR, BR, BL (in marker frame)
     # Corner 0 = top-left, Corner 1 = top-right
     # Corner 2 = bottom-right, Corner 3 = bottom-left
-    
+
     # X-axis: from left to right (corner 0->1 or corner 3->2)
     vec_top = corner_points_3d[1] - corner_points_3d[0]  # TL -> TR
     vec_bottom = corner_points_3d[2] - corner_points_3d[3]  # BL -> BR
     x_axis = (vec_top + vec_bottom) / 2.0
     x_axis = x_axis / np.linalg.norm(x_axis)
-    
+
     # Y-axis: from bottom to top (corner 3->0 or corner 2->1)
     vec_left = corner_points_3d[0] - corner_points_3d[3]  # BL -> TL
     vec_right = corner_points_3d[1] - corner_points_3d[2]  # BR -> TR
     y_axis = (vec_left + vec_right) / 2.0
     y_axis = y_axis / np.linalg.norm(y_axis)
-    
+
     # Z-axis: normal to marker plane (pointing towards camera)
     z_axis = np.cross(x_axis, y_axis)
     z_axis = z_axis / np.linalg.norm(z_axis)
-    
+
     # Re-orthogonalize Y to ensure orthonormal basis
     y_axis = np.cross(z_axis, x_axis)
     y_axis = y_axis / np.linalg.norm(y_axis)
-    
+
     # Build rotation matrix (columns are axis vectors)
     R = np.column_stack([x_axis, y_axis, z_axis])
-    
+
     # Convert to quaternion
     quat = rotation_matrix_to_quaternion(R)
-    
+
     return center_3d, quat
 
 
@@ -162,7 +162,7 @@ def _sample_depth_nearby(
     Uses a small window around (u, v) and takes the median valid depth.
     """
     height, width = depth_image.shape[:2]
-    
+
     valid_depths = []
     for du in range(-radius, radius + 1):
         for dv in range(-radius, radius + 1):
@@ -171,13 +171,82 @@ def _sample_depth_nearby(
                 depth_raw = float(depth_image[nv, nu])
                 if depth_raw > 0:
                     valid_depths.append(depth_raw)
-    
+
     if not valid_depths:
         return None
-    
+
     # Use median depth for robustness
     median_depth_raw = float(np.median(valid_depths))
     depth_m = median_depth_raw * 0.001
-    
+
     X, Y, Z = rs.rs2_deproject_pixel_to_point(intrinsics, [float(u), float(v)], depth_m)
     return [float(X), float(Y), float(Z)]
+
+
+def align_quaternion_to_xy_plane(
+    quat: List[float],
+    reference_z_axis: Optional[np.ndarray] = None,
+) -> List[float]:
+    """
+    Align a quaternion so its XY plane is parallel to a reference XY plane.
+
+    This projects the original X-axis onto the reference XY plane and
+    sets the Z-axis to match the reference Z-axis (default: [0, 0, 1]).
+
+    This is useful for ensuring ArUco marker frames have their XY plane
+    aligned with the robot base frame's XY plane, regardless of any tilt
+    in the depth-based orientation computation.
+
+    Args:
+        quat: Input quaternion [x, y, z, w]
+        reference_z_axis: The Z-axis to align to. Defaults to [0, 0, 1] (up).
+
+    Returns:
+        Aligned quaternion [x, y, z, w]
+    """
+    from scipy.spatial.transform import Rotation
+
+    if reference_z_axis is None:
+        reference_z_axis = np.array([0.0, 0.0, 1.0])
+    else:
+        reference_z_axis = np.array(reference_z_axis, dtype=float)
+        reference_z_axis = reference_z_axis / np.linalg.norm(reference_z_axis)
+
+    # Convert input quaternion to rotation matrix
+    rot = Rotation.from_quat(quat)
+    rot_mat = rot.as_matrix()
+
+    # Get the original X-axis
+    original_x_axis = rot_mat[:, 0]
+
+    # Project X-axis onto the reference XY plane
+    # The reference XY plane has normal = reference_z_axis
+    # Projection: x_proj = x - (x · z) * z
+    x_dot_z = np.dot(original_x_axis, reference_z_axis)
+    aligned_x_axis = original_x_axis - x_dot_z * reference_z_axis
+
+    x_norm = np.linalg.norm(aligned_x_axis)
+    if x_norm > 1e-6:
+        aligned_x_axis = aligned_x_axis / x_norm
+    else:
+        # Fallback: if X-axis was nearly parallel to Z, use reference X
+        aligned_x_axis = np.array([1.0, 0.0, 0.0])
+        # Ensure it's orthogonal to reference_z_axis
+        aligned_x_axis = (
+            aligned_x_axis - np.dot(aligned_x_axis, reference_z_axis) * reference_z_axis
+        )
+        aligned_x_axis = aligned_x_axis / np.linalg.norm(aligned_x_axis)
+
+    # Z-axis is the reference Z-axis
+    aligned_z_axis = reference_z_axis
+
+    # Y-axis = Z cross X (right-hand rule)
+    aligned_y_axis = np.cross(aligned_z_axis, aligned_x_axis)
+    aligned_y_axis = aligned_y_axis / np.linalg.norm(aligned_y_axis)
+
+    # Build rotation matrix and convert to quaternion
+    aligned_rot_mat = np.column_stack([aligned_x_axis, aligned_y_axis, aligned_z_axis])
+    aligned_rot = Rotation.from_matrix(aligned_rot_mat)
+    aligned_quat = aligned_rot.as_quat()  # [x, y, z, w]
+
+    return aligned_quat.tolist()
