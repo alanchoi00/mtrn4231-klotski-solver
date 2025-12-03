@@ -136,6 +136,28 @@ class Sense(Node):
             board=self.board_config.frame_id,
         )
 
+        # ArUco frame correction offsets (in base_link frame)
+        aruco_offset_x = declare_param[float](
+            self,
+            "aruco_offset_x_m",
+            "ArUco X offset correction",
+        )
+        aruco_offset_y = declare_param[float](
+            self,
+            "aruco_offset_y_m",
+            "ArUco Y offset correction",
+        )
+        aruco_offset_z = declare_param[float](
+            self,
+            "aruco_offset_z_m",
+            "ArUco Z offset correction",
+        )
+        board_rotation_offset_deg = declare_param[float](
+            self,
+            "board_rotation_offset_deg",
+            "Board rotation offset around Z-axis (degrees)",
+        )
+
         hsv_file = declare_param[str](self, "hsv_config_file", "HSV config file path")
 
         self.hsv_config_manager = HSVConfigManager(self, hsv_file)
@@ -155,6 +177,10 @@ class Sense(Node):
             board_ref_marker_id=self.board_config.bl_marker,
             board_offset_x_m=self.board_config.offset_x,
             board_offset_y_m=self.board_config.offset_y,
+            aruco_offset_x_m=aruco_offset_x,
+            aruco_offset_y_m=aruco_offset_y,
+            aruco_offset_z_m=aruco_offset_z,
+            board_rotation_offset_deg=board_rotation_offset_deg,
         )
 
         self.capture_board_handler = CaptureBoardHandler(

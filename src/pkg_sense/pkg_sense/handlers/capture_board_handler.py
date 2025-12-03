@@ -180,9 +180,10 @@ class CaptureBoardHandler:
 
         depth_image = self.camera.get_depth_image()
         if depth_image is None:
-            self.logger.warn(
+            raise RuntimeError(
                 "Depth image not available. "
-                "TF info logging will be disabled for this capture."
+                "Depth camera is required for accurate ArUco frame computation. "
+                "Ensure depth camera is publishing to the aligned depth topic."
             )
 
         marker_poses = self.tf.update_markers(
