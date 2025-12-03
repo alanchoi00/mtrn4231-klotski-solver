@@ -30,6 +30,7 @@ setup(
     entry_points={
         "console_scripts": [
             "mock_sense = pkg_sense.scripts.mock_sense_node:main",
+            'mock_baselink = pkg_sense.mock_baselink:main',
             "sense = pkg_sense.sense_node:main",
             "test_hsv_sense = pkg_sense.scripts.test_hsv_sense:main",
             "mock_camera_pub = pkg_sense.scripts.mock_camera_pub:main",
