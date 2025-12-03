@@ -1,0 +1,6 @@
+# Request to update ArUco offsets (runtime only)
+klotski_interfaces/ArucoOffsets offsets
+---
+# Response after setting offsets
+bool ok
+string message

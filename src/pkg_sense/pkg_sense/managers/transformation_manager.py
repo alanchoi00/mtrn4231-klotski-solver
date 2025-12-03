@@ -19,6 +19,7 @@ from ..services.transformation_math import (
     depth_pixel_to_point,
     rotation_matrix_to_quaternion,
     compute_marker_pose_from_depth,
+    align_quaternion_to_xy_plane,
 )
 
 if TYPE_CHECKING:
@@ -78,15 +79,15 @@ class TransformationManager:
         self.board_ref_marker_id = board_ref_marker_id
         self.board_offset_x_m = board_offset_x_m
         self.board_offset_y_m = board_offset_y_m
-        
+
         # ArUco frame correction offsets (applied in base_link frame)
         self.aruco_offset_x_m = aruco_offset_x_m
         self.aruco_offset_y_m = aruco_offset_y_m
         self.aruco_offset_z_m = aruco_offset_z_m
-        
+
         # Board rotation offset (degrees around Z-axis)
         self.board_rotation_offset_deg = board_rotation_offset_deg
-        
+
         self.bootstrap_samples = bootstrap_samples
         self.bootstrap_spread_thresh = bootstrap_spread_thresh
         self.outlier_thresh = outlier_thresh
@@ -147,7 +148,7 @@ class TransformationManager:
     ) -> Dict[int, PoseStamped]:
         """
         Main entrypoint called from the sensing pipeline.
-        
+
         Uses depth camera to compute all ArUco marker poses for better accuracy.
 
         Returns: mapping marker_id -> PoseStamped (in camera_frame)
@@ -191,7 +192,7 @@ class TransformationManager:
                 intrinsics,
                 self.board_marker_length_m,
             )
-            
+
             if depth_result is not None:
                 t_raw, quat_raw = depth_result
                 self.node.get_logger().debug(
@@ -225,7 +226,9 @@ class TransformationManager:
 
             # Log depth vs PnP comparison for debugging (only for ref marker)
             if marker_id == self.board_ref_marker_id:
-                self._debug_log_marker_pose_in_base(info, depth_image, intrinsics, stamp)
+                self._debug_log_marker_pose_in_base(
+                    info, depth_image, intrinsics, stamp
+                )
 
         # Validate that at least some markers were processed
         if not marker_poses_cam:
@@ -255,11 +258,11 @@ class TransformationManager:
     def broadcast_marker_tf(self, marker_id: int, pose_cam: PoseStamped) -> None:
         """
         Publish transform base_frame -> aruco_<marker_id>.
-        
+
         The marker pose is first transformed to base_frame, then ArUco offset
         corrections are applied (configurable in yaml). The orientation is
         adjusted so that the ArUco frame's XY plane is parallel to base_link's
-        XY plane (Z-axis up).
+        XY plane (Z-axis up), regardless of the computed depth transformation.
         """
         # Transform marker pose to base frame
         try:
@@ -287,45 +290,23 @@ class TransformationManager:
             self.tf_broadcaster.sendTransform(tf_msg)
             self._cached_tf[tf_msg.child_frame_id] = tf_msg
             return
-        
+
         # Apply ArUco offset corrections in base frame
         corrected_x = pose_base.pose.position.x + self.aruco_offset_x_m
         corrected_y = pose_base.pose.position.y + self.aruco_offset_y_m
         corrected_z = pose_base.pose.position.z + self.aruco_offset_z_m
-        
-        # Compute aligned orientation (XY plane parallel to base_link XY plane)
-        from scipy.spatial.transform import Rotation
-        
+
+        # Align orientation so XY plane is parallel to base_link XY plane
+        # This ensures the ArUco frame is always horizontal regardless of
+        # any tilt detected by the depth-based pose computation
         marker_quat_base = [
             pose_base.pose.orientation.x,
             pose_base.pose.orientation.y,
             pose_base.pose.orientation.z,
             pose_base.pose.orientation.w,
         ]
-        marker_rot = Rotation.from_quat(marker_quat_base)
-        marker_rot_mat = marker_rot.as_matrix()
-        
-        # Get marker's X-axis and project onto XY plane
-        marker_x_axis = marker_rot_mat[:, 0]
-        aligned_x_axis = np.array([marker_x_axis[0], marker_x_axis[1], 0.0])
-        x_norm = np.linalg.norm(aligned_x_axis)
-        if x_norm > 1e-6:
-            aligned_x_axis = aligned_x_axis / x_norm
-        else:
-            aligned_x_axis = np.array([1.0, 0.0, 0.0])
-        
-        # Z-axis is always up (same as base_link)
-        aligned_z_axis = np.array([0.0, 0.0, 1.0])
-        
-        # Y-axis = Z cross X (right-hand rule)
-        aligned_y_axis = np.cross(aligned_z_axis, aligned_x_axis)
-        aligned_y_axis = aligned_y_axis / np.linalg.norm(aligned_y_axis)
-        
-        # Build rotation matrix and convert to quaternion
-        aligned_rot_mat = np.column_stack([aligned_x_axis, aligned_y_axis, aligned_z_axis])
-        aligned_rot = Rotation.from_matrix(aligned_rot_mat)
-        aligned_quat = aligned_rot.as_quat()  # [x, y, z, w]
-        
+        aligned_quat = align_quaternion_to_xy_plane(marker_quat_base)
+
         # Broadcast corrected marker pose in base frame with aligned orientation
         tf_msg = TransformStamped()
         tf_msg.header.stamp = pose_cam.header.stamp
@@ -345,9 +326,9 @@ class TransformationManager:
     def broadcast_tf_board(self, marker_id: int, stamp: Time) -> None:
         """
         Publish transform base_frame -> board_frame.
-        
+
         The board frame is positioned at the marker center + offsets,
-        but with orientation ALIGNED to base_link (Z-axis up, XY plane horizontal).
+        with orientation ALIGNED to base_link (Z-axis up, XY plane horizontal).
         This makes the board frame easier to work with for manipulation.
         """
         # Get the marker TF from cache (already in base_frame with ArUco offsets applied)
@@ -357,61 +338,66 @@ class TransformationManager:
                 f"[tf] Cannot broadcast board frame: marker {marker_id} TF not cached"
             )
             return
-        
+
         marker_tf = self._cached_tf[marker_tf_key]
-        
+
         from scipy.spatial.transform import Rotation
-        
-        # Get marker pose in base frame (already corrected with ArUco offsets)
-        marker_pos_base = np.array([
-            marker_tf.transform.translation.x,
-            marker_tf.transform.translation.y,
-            marker_tf.transform.translation.z,
-        ])
+
+        # Get marker pose in base frame (already corrected with ArUco offsets and aligned)
+        marker_pos_base = np.array(
+            [
+                marker_tf.transform.translation.x,
+                marker_tf.transform.translation.y,
+                marker_tf.transform.translation.z,
+            ]
+        )
         marker_quat_base = [
             marker_tf.transform.rotation.x,
             marker_tf.transform.rotation.y,
             marker_tf.transform.rotation.z,
             marker_tf.transform.rotation.w,
         ]
-        
+
         # Get the marker rotation matrix in base frame (already aligned with base_link XY plane)
         marker_rot = Rotation.from_quat(marker_quat_base)
         marker_rot_mat = marker_rot.as_matrix()
-        
+
         # Apply offset in marker's local frame to get board position
         local_offset = np.array([self.board_offset_x_m, self.board_offset_y_m, 0.0])
         board_pos_base = marker_pos_base + marker_rot_mat @ local_offset
-        
-        # Board orientation: Start with Z-axis up, then use marker X projected to XY plane
-        # The marker is already aligned (Z-up), so we just need to apply the rotation offset
-        marker_x_axis = marker_rot_mat[:, 0]  # First column is X-axis (already in XY plane)
-        
+
+        # Board orientation: marker is already aligned (Z-up), apply rotation offset
+        marker_x_axis = marker_rot_mat[
+            :, 0
+        ]  # First column is X-axis (already in XY plane)
+
         # Apply rotation offset around Z-axis
         rotation_offset_rad = np.deg2rad(self.board_rotation_offset_deg)
         cos_offset = np.cos(rotation_offset_rad)
         sin_offset = np.sin(rotation_offset_rad)
-        
+
         # Rotate the X-axis by the offset angle around Z
-        board_x_axis = np.array([
-            cos_offset * marker_x_axis[0] - sin_offset * marker_x_axis[1],
-            sin_offset * marker_x_axis[0] + cos_offset * marker_x_axis[1],
-            0.0  # Ensure Z is 0 for XY plane alignment
-        ])
+        board_x_axis = np.array(
+            [
+                cos_offset * marker_x_axis[0] - sin_offset * marker_x_axis[1],
+                sin_offset * marker_x_axis[0] + cos_offset * marker_x_axis[1],
+                0.0,  # Ensure Z is 0 for XY plane alignment
+            ]
+        )
         board_x_axis = board_x_axis / np.linalg.norm(board_x_axis)
-        
+
         # Z-axis is always up (aligned with base_link)
         board_z_axis = np.array([0.0, 0.0, 1.0])
-        
+
         # Y-axis = Z cross X (right-hand rule)
         board_y_axis = np.cross(board_z_axis, board_x_axis)
         board_y_axis = board_y_axis / np.linalg.norm(board_y_axis)
-        
+
         # Build rotation matrix (columns are axis vectors)
         board_rot_mat = np.column_stack([board_x_axis, board_y_axis, board_z_axis])
         board_rot = Rotation.from_matrix(board_rot_mat)
         board_quat = board_rot.as_quat()  # [x, y, z, w]
-        
+
         # Broadcast board frame as child of base_frame
         tf_msg = TransformStamped()
         tf_msg.header.stamp = stamp.to_msg()
@@ -546,7 +532,7 @@ class TransformationManager:
 
         The board is offset from the marker by (board_offset_x_m, board_offset_y_m)
         in the marker's local frame.
-        
+
         The board orientation is ALIGNED with base_link:
         - Z-axis points up (same as base_link Z)
         - X-axis is the marker's X projected onto the XY plane
@@ -577,11 +563,13 @@ class TransformationManager:
             return None
 
         # Get marker pose in base frame
-        marker_pos_base = np.array([
-            marker_base.pose.position.x,
-            marker_base.pose.position.y,
-            marker_base.pose.position.z,
-        ])
+        marker_pos_base = np.array(
+            [
+                marker_base.pose.position.x,
+                marker_base.pose.position.y,
+                marker_base.pose.position.z,
+            ]
+        )
         marker_quat_base = [
             marker_base.pose.orientation.x,
             marker_base.pose.orientation.y,
@@ -589,51 +577,28 @@ class TransformationManager:
             marker_base.pose.orientation.w,
         ]
 
-        # Get the marker rotation matrix in base frame
-        marker_rot = Rotation.from_quat(marker_quat_base)
-        marker_rot_mat = marker_rot.as_matrix()
+        # Align orientation so XY plane is parallel to base_link XY plane
+        aligned_quat = align_quaternion_to_xy_plane(marker_quat_base)
+
+        # Get the aligned rotation matrix in base frame
+        aligned_rot = Rotation.from_quat(aligned_quat)
+        aligned_rot_mat = aligned_rot.as_matrix()
 
         # Apply offset in marker's local frame to get board position
         local_offset = np.array([self.board_offset_x_m, self.board_offset_y_m, 0.0])
-        board_pos_base = marker_pos_base + marker_rot_mat @ local_offset
+        board_pos_base = marker_pos_base + aligned_rot_mat @ local_offset
 
-        # Create board orientation ALIGNED with base_link
-        # Z-axis: up (same as base_link Z)
-        # X-axis: project marker's X onto the XY plane and normalize
-        marker_x_axis = marker_rot_mat[:, 0]  # First column is X-axis
-
-        # Project onto XY plane (set Z component to 0) and normalize
-        board_x_axis = np.array([marker_x_axis[0], marker_x_axis[1], 0.0])
-        board_x_norm = np.linalg.norm(board_x_axis)
-        if board_x_norm > 1e-6:
-            board_x_axis = board_x_axis / board_x_norm
-        else:
-            # Fallback: use base_link X-axis
-            board_x_axis = np.array([1.0, 0.0, 0.0])
-
-        # Z-axis is always up
-        board_z_axis = np.array([0.0, 0.0, 1.0])
-
-        # Y-axis = Z cross X
-        board_y_axis = np.cross(board_z_axis, board_x_axis)
-        board_y_axis = board_y_axis / np.linalg.norm(board_y_axis)
-
-        # Build rotation matrix (columns are axis vectors)
-        board_rot_mat = np.column_stack([board_x_axis, board_y_axis, board_z_axis])
-        board_rot = Rotation.from_matrix(board_rot_mat)
-        board_quat = board_rot.as_quat()  # [x, y, z, w]
-
-        # Build board pose in base frame
+        # Build board pose in base frame (already aligned)
         board_base = PoseStamped()
         board_base.header.stamp = marker_pose_cam.header.stamp
         board_base.header.frame_id = self.base_frame
         board_base.pose.position.x = float(board_pos_base[0])
         board_base.pose.position.y = float(board_pos_base[1])
         board_base.pose.position.z = float(board_pos_base[2])
-        board_base.pose.orientation.x = float(board_quat[0])
-        board_base.pose.orientation.y = float(board_quat[1])
-        board_base.pose.orientation.z = float(board_quat[2])
-        board_base.pose.orientation.w = float(board_quat[3])
+        board_base.pose.orientation.x = float(aligned_quat[0])
+        board_base.pose.orientation.y = float(aligned_quat[1])
+        board_base.pose.orientation.z = float(aligned_quat[2])
+        board_base.pose.orientation.w = float(aligned_quat[3])
 
         return board_base
 
