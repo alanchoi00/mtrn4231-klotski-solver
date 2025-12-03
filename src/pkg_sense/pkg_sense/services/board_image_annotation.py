@@ -115,7 +115,7 @@ def render_annotated_grid_overlay_image(
                 colour,
                 (x_slice.start + 3, y_slice.start + 15),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
+                0.30,
                 (0, 0, 0),
                 1,
             )
