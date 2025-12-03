@@ -11,6 +11,7 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
+
 def generate_launch_description():
     """
     Klotski robot system launch description.
@@ -90,8 +91,8 @@ def generate_launch_description():
                             "ur_type": "ur5e",
                             "use_fake_hardware": LaunchConfiguration("sim"),
                             "launch_rviz": "true",
-                            # "description_package": "ur_with_gripper_description",
-                            # "description_file": "ur_with_gripper.xacro",
+                            "description_package": "ur_with_gripper_description",
+                            "description_file": "ur_with_gripper.xacro",
                         }.items(),
                     ),
                 ],
