@@ -44,6 +44,7 @@ def generate_launch_description():
                     "enable_color:=true",
                     "enable_depth:=true",
                     "align_depth.enable:=true",
+                    "pointcloud.enable:=true",
                     "rgb_camera.exposure:=1000",
                 ],
                 output="screen",
