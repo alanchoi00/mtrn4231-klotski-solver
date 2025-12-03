@@ -327,12 +327,74 @@ void ArmManipulator::execute(
   }
 }
 
+// bool ArmManipulator::execute_approach(
+//     const std::shared_ptr<GoalHandleMove> goal_handle,
+//     std::shared_ptr<MoveAction::Feedback> feedback,
+//     geometry_msgs::msg::PoseStamped target_pose) {
+//   RCLCPP_INFO(this->get_logger(),
+//               "Moving to approach position (APPROACH height)");
+
+//   feedback->progress = 0.1;
+//   goal_handle->publish_feedback(feedback);
+
+//   target_pose.pose.position.z = approach_height_;
+
+//   RCLCPP_INFO(this->get_logger(), "Target: (%.3f, %.3f, %.3f)",
+//               target_pose.pose.position.x, target_pose.pose.position.y,
+//               target_pose.pose.position.z);
+
+//   // Check if target is reachable
+//   auto current_pose = move_group_interface_->getCurrentPose();
+//   double distance =
+//       sqrt(pow(target_pose.pose.position.x - current_pose.pose.position.x, 2)
+//       +
+//            pow(target_pose.pose.position.y - current_pose.pose.position.y, 2)
+//            + pow(target_pose.pose.position.z - current_pose.pose.position.z,
+//            2));
+//   RCLCPP_INFO(this->get_logger(), "Distance to target: %.3fm", distance);
+
+//   feedback->progress = 0.3;
+//   goal_handle->publish_feedback(feedback);
+
+//   feedback->progress = 0.5;
+//   goal_handle->publish_feedback(feedback);
+
+//   // Final safety check before executing motion
+//   if (safety_stop_active_.load()) {
+//     RCLCPP_ERROR(this->get_logger(),
+//                  "🛑 Approach motion aborted: Safety stop active");
+//     return false;
+//   }
+
+//   // Use Cartesian path only for predictable motion (no fallback to regular
+//   // planning)
+//   bool success = planAndExecuteCartesianPath(target_pose, false);
+
+//   if (!success) {
+//     RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed");
+//     RCLCPP_ERROR(this->get_logger(), "Current robot pose: (%.3f, %.3f,
+//     %.3f)",
+//                  move_group_interface_->getCurrentPose().pose.position.x,
+//                  move_group_interface_->getCurrentPose().pose.position.y,
+//                  move_group_interface_->getCurrentPose().pose.position.z);
+//   }
+
+//   feedback->progress = 1.0;
+//   goal_handle->publish_feedback(feedback);
+
+//   return success;
+// }
+
 bool ArmManipulator::execute_approach(
     const std::shared_ptr<GoalHandleMove> goal_handle,
     std::shared_ptr<MoveAction::Feedback> feedback,
     geometry_msgs::msg::PoseStamped target_pose) {
   RCLCPP_INFO(this->get_logger(),
               "Moving to approach position (APPROACH height)");
+
+  RCLCPP_WARN(this->get_logger(),
+              "[Path Planning] Approach: trying Cartesian path first, "
+              "will change to joint-space planning if it fails");
 
   feedback->progress = 0.1;
   goal_handle->publish_feedback(feedback);
@@ -343,7 +405,6 @@ bool ArmManipulator::execute_approach(
               target_pose.pose.position.x, target_pose.pose.position.y,
               target_pose.pose.position.z);
 
-  // Check if target is reachable
   auto current_pose = move_group_interface_->getCurrentPose();
   double distance =
       sqrt(pow(target_pose.pose.position.x - current_pose.pose.position.x, 2) +
@@ -351,35 +412,53 @@ bool ArmManipulator::execute_approach(
            pow(target_pose.pose.position.z - current_pose.pose.position.z, 2));
   RCLCPP_INFO(this->get_logger(), "Distance to target: %.3fm", distance);
 
-  feedback->progress = 0.3;
-  goal_handle->publish_feedback(feedback);
-
   feedback->progress = 0.5;
   goal_handle->publish_feedback(feedback);
 
-  // Final safety check before executing motion
   if (safety_stop_active_.load()) {
     RCLCPP_ERROR(this->get_logger(),
                  "🛑 Approach motion aborted: Safety stop active");
     return false;
   }
 
-  // Use Cartesian path only for predictable motion (no fallback to regular
-  // planning)
+  // Cartesian first，stiwch to joint-space when fail
   bool success = planAndExecuteCartesianPath(target_pose, false);
 
+  // if (!success) {
+  //   RCLCPP_WARN(
+  //       this->get_logger(),
+  //       "Cartesian approach failed, falling back to joint-space planning");
+  //   success = planAndExecuteSmoothedMotion(target_pose, false);
+  // }
   if (!success) {
-    RCLCPP_ERROR(this->get_logger(), "Cartesian planning failed");
+    RCLCPP_WARN(this->get_logger(),
+                "CARTESIAN APPROACH FAILED, SWITCH TO JOINT-SPACE ");
+    success = planAndExecuteSmoothedMotion(target_pose, false);
+  }
+
+  // if (!success) {
+  //   RCLCPP_ERROR(this->get_logger(), "Approach planning failed");
+  //   RCLCPP_ERROR(this->get_logger(), "Current robot pose: (%.3f, %.3f,
+  //   %.3f)",
+  //                move_group_interface_->getCurrentPose().pose.position.x,
+  //                move_group_interface_->getCurrentPose().pose.position.y,
+  //                move_group_interface_->getCurrentPose().pose.position.z);
+  //   return false;
+  // }
+
+  if (!success) {
+    RCLCPP_ERROR(this->get_logger(), "APPROACH PLANNING TOTAL FAIL");
     RCLCPP_ERROR(this->get_logger(), "Current robot pose: (%.3f, %.3f, %.3f)",
                  move_group_interface_->getCurrentPose().pose.position.x,
                  move_group_interface_->getCurrentPose().pose.position.y,
                  move_group_interface_->getCurrentPose().pose.position.z);
+    return false;
   }
 
   feedback->progress = 1.0;
   goal_handle->publish_feedback(feedback);
 
-  return success;
+  return true;
 }
 
 bool ArmManipulator::execute_pick_place(
@@ -409,11 +488,21 @@ bool ArmManipulator::execute_pick_place(
   }
 
   // For vertical movements like pick/place, Cartesian path is required
+
+  // bool success = planAndExecuteCartesianPath(target_pose, true);
+
+  // if (!success) {
+  //   RCLCPP_ERROR(this->get_logger(),
+  //                "Cartesian planning failed for pick/place");
+  // }
+
+  // Cartesian first，stiwch to joint-space when fail
   bool success = planAndExecuteCartesianPath(target_pose, true);
 
   if (!success) {
-    RCLCPP_ERROR(this->get_logger(),
-                 "Cartesian planning failed for pick/place");
+    RCLCPP_WARN(this->get_logger(),
+                "Pick/place Cartesian failed, falling back to joint-space");
+    success = planAndExecuteSmoothedMotion(target_pose, true);
   }
 
   feedback->progress = 0.6;
@@ -567,7 +656,7 @@ geometry_msgs::msg::PoseStamped ArmManipulator::calculateWorldPose(double col,
   pose.pose.position.z = board_height_;
 
   tf2::Quaternion q;
-  q.setRPY(0.0, M_PI, board_rotation_yaw_);
+  q.setRPY(0.0, M_PI, board_rotation_yaw_ - M_PI_2);
   pose.pose.orientation = tf2::toMsg(q);
 
   // debug
@@ -801,8 +890,9 @@ void ArmManipulator::safety_stop_callback(
 
   if (msg->data && !was_active) {
     // Safety stop activated - stop any ongoing motion immediately
-    RCLCPP_ERROR(this->get_logger(),
-                 "🛑 EMERGENCY STOP: Safety stop activated - halting arm motion");
+    RCLCPP_ERROR(
+        this->get_logger(),
+        "🛑 EMERGENCY STOP: Safety stop activated - halting arm motion");
 
     if (move_group_interface_) {
       move_group_interface_->stop();
