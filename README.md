@@ -730,14 +730,20 @@ Main launch configuration for the complete system.
 
 ## 🗿 References and Acknowledgements
 
-- Ros2 webserverce
-- Ros2 Bridage
-- mediapipe
-- pyrealsense2
-- cv_bridge
+### References
 
-Thank to David Nie for supporting
-Thanks to Will Midgley
+- Ros2 Web Bridge. Robot Web Tools, https://github.com/RobotWebTools/ros2-web-bridge
+- Ros2 Bridge. Robot Web Tools, https://github.com/RobotWebTools/rosbridge_suite
+- MediaPipe Hand Landmarker. Google, https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker
+- Librealsense(pyrealsense2). Intel RealSense, https://github.com/realsenseai/librealsense
+- Vision Opencv (Cv Bridge). ROS Perception, https://github.com/ros-perception/vision_opencv
+- Klotski Webpage. 2swap, https://2swap.github.io/Klotski-Webpage/data.json
+
+### Acknowledgements
+We would like to thank our tutor, David Nie, for his careful guidance and dedicated support throughout our project. David provided us with many valuable suggestions that greatly improved our work. 
+
+We would also like to thank our course convenor, Will Midgely, for providing the project topic and for his support during the course.
+
 
 ## 📄 License
 
