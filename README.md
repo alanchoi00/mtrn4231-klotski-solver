@@ -25,11 +25,16 @@
       - [Python Dependencies](#python-dependencies)
     - [1. Clone and Build ROS Workspace](#1-clone-and-build-ros-workspace)
     - [2. Install Dashboard Dependencies](#2-install-dashboard-dependencies)
+    - [3. Configuration](#3-configuration)
+      - [Environment Variables](#environment-variables)
+    - [4. Camera Calibration](#4-camera-calibration)
+      - [HSV Color Calibration](#hsv-color-calibration)
+      - [Hand Safety Zone Calibration](#hand-safety-zone-calibration)
+    - [Hardware Setup](#hardware-setup)
   - [⚙️ Running the System](#️-running-the-system)
   - [🔧 Development](#-development)
     - [Building Individual Packages](#building-individual-packages)
     - [ROS2 Commands](#ros2-commands)
-    - [Camera Calibration](#camera-calibration)
   - [📈 Results and Demonstration](#-results-and-demonstration)
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
   - [👥 Contributors and Roles](#-contributors-and-roles)
@@ -66,12 +71,12 @@ The system continuously observes a physical Klotski board, tracks the board stat
 
 ### RQT Node Graph
 
-![RQT Node Graph](Images/RQT_Node_Graph.png)
+![RQT Node Graph](images/RQT_Node_Graph.png)
 > *Generated using `rqt_graph` showing active nodes and topic connections.* Filtered out internal ROS2 nodes for clarity.
 
 ### Package-Level Interaction
 
-![Package Interaction Diagram](Images/Package_Interaction_Diagram.svg)
+![Package Interaction Diagram](images/Package_Interaction_Diagram.svg)
 
 > *Interactive diagram generated with [draw.io](https://app.diagrams.net/).*
 
@@ -115,7 +120,7 @@ flowchart TD
 #### Closed-Loop Operation
 
 #### Brain Node
-The central orchestrator that coordinates all system operations through a modular manager architecture. It manages the complete sense-plan-act loop using a 5-phase manipulation sequence (Sense -> Plan -> Approach -> Grip Close -> Pick/Place -> Grip Open -> Retreat). The node handles UI commands for mode switching (auto/step/pause/reset), subscribes to board state updates from the sense node, integrates with the safety system to pause/resume operations when hands are detected, and delegates tasks to specialized managers (UIManager, ServiceManager, ActionExecutor, PipelineOrchestrator). The pipeline orchestrator implements a **Chain of Responsibility pattern** where handlers are processed sequentially, each deciding whether to handle the current state or pass to the next handler in the chain.
+The central orchestrator that coordinates all system operations through a modular manager architecture. It manages the complete sense-plan-act loop using a 5-phase manipulation sequence (Sense -> Plan -> Approach -> Grip Close -> Pick/Place -> Grip Open -> Retreat). The node handles UI commands for mode switching (auto/step/pause/reset), subscribes to board state updates from the sense node, integrates with the safety system to pause/resume operations when hands are detected, and delegates tasks to specialised managers (UIManager, ServiceManager, ActionExecutor, PipelineOrchestrator). The pipeline orchestrator implements a **Chain of Responsibility pattern** where handlers are processed sequentially, each deciding whether to handle the current state or pass to the next handler in the chain.
 
 #### Sense Node
 
@@ -123,7 +128,7 @@ The central orchestrator that coordinates all system operations through a modula
 Monitors the camera feed for human hands using [MediaPipe Hands detection](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker). When hands are detected within a configurable polygon ROI (safety zone), it immediately publishes a stop signal on `/safety/stop`. The safety stop clears after a configurable number of consecutive frames without hands, allowing automatic resumption of operations. Provides services for dynamically adjusting the safety zone via the dashboard.
 
 #### Plan Node
-A C++ ROS2 service node that implements the Klotski puzzle solver using BFS (Breadth-First Search) to find the optimal (shortest) sequence of moves from the current board state to the goal configuration. It accepts `SolveBoard` service requests and returns a `MoveList` containing the solution path. The solver operates on a grid representation, identifying pieces by type (1×1, 1×2, 2×1, 2×2) and computing valid sliding moves.
+A C++ ROS2 service node that finds the optimal move sequence to solve the Klotski puzzle. Given the current board state and a goal configuration via the `SolveBoard` service, it returns the shortest `MoveList` using **BFS** over the state-space graph. The solver represents the 4×5 board as a grid with four piece types (1×1, 1×2, 2×1, 2×2) and explores valid sliding moves. [Precomputed graph data](https://2swap.github.io/Klotski-Webpage/data.json) enumerating all 65,880 reachable configurations accelerates pathfinding.
 
 #### Arm Manipulation Node
 
@@ -207,7 +212,7 @@ The vision pipeline consists of four major stages:
 
 The custom end effector is a parallel gripper driven by a single servo motor. It consists primarily of laser-cut acrylic sheet and plywood.
 
-![Gripper assembly render](Images/Assembly_2.png)
+![Gripper assembly render](images/Assembly_2.png)
 
 - **Control**: Arduino-based serial communication
 - **Actuation**: Single servo motor for parallel jaw movement
@@ -259,7 +264,7 @@ sudo apt install ros-humble-cv-bridge
 #### Python Dependencies
 
 ```bash
-pip install opencv-python mediapipe pyserial scipy
+pip install opencv-python mediapipe pyserial pyrealsense2 scipy
 ```
 
 ### 1. Clone and Build ROS Workspace
@@ -276,6 +281,69 @@ source install/setup.bash
 cd src/dashboard_app
 npm install
 ```
+
+### 3. Configuration
+
+The system uses YAML configuration files located in each package's `config/` directory. Key parameters can be adjusted without rebuilding:
+
+| Config File | Description |
+|-------------|-------------|
+| `pkg_brain/config/brain.config.yaml` | Delay between moves, timing parameters |
+| `pkg_manipulation/config/arm.config.yaml` | MoveIt planning parameters, velocity/acceleration limits, board geometry, height offsets |
+| `pkg_manipulation/config/gripper.config.yaml` | Serial port, baud rate, gripper timing |
+| `pkg_sense/config/sense.config.yaml` | Board dimensions, ArUco marker IDs/sizes, frame IDs, piece color counts |
+| `pkg_sense/config/hand_safety.config.yaml` | Detection confidence, safety zone ROI polygon, clear-after-frames threshold |
+| `pkg_sense/config/hsv_ranges.default.yaml` | HSV color ranges for piece detection (can be tuned via dashboard) |
+
+#### Environment Variables
+
+The launch scripts use the following defaults that can be overridden:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ROBOT_IP` | `192.168.0.100` | UR5e robot IP address |
+| Camera TF | See below | Camera-to-base transform (hand-eye calibration result) |
+
+### 4. Camera Calibration
+
+The system requires a camera-to-robot base transform (hand-eye calibration). This can be provided in two ways:
+
+**Option 1: Command-line arguments** (recommended for quick adjustments)
+```bash
+# ./runKlotski.sh x y z qx qy qz qw
+./runKlotski.sh 1.31 0.02 0.67 -0.40 0.00 0.92 0.01
+```
+
+**Option 2: Use calibration script** to compute the transform from ArUco marker observations:
+```bash
+# Preview camera feed and marker detection
+python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode preview
+
+# Collect calibration samples (move robot to different poses)
+python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode collect --samples 20
+
+# Compute optimal transform
+python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode compute
+```
+
+See `docs/CAMERA_CALIBRATION.md` for detailed calibration instructions.
+
+#### HSV Color Calibration
+
+Piece color detection ranges can be calibrated via the dashboard's **Color Masker** tool:
+1. Navigate to the Color Masker tab in the dashboard
+2. Adjust HSV sliders while viewing the live camera feed
+3. Export calibrated ranges to `hsv_ranges.default.yaml`
+
+#### Hand Safety Zone Calibration
+The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection Viewer**:
+1. Navigate to the Hand Detection Viewer tab
+2. Drag the polygon vertices to define the safety zone
+3. Changes are applied in real-time
+
+### Hardware Setup
+
+TODO
 
 ## ⚙️ Running the System
 
@@ -295,7 +363,20 @@ npm install
 ./runKlotskiSim.sh
 ```
 
+3 new terminals will open:
+- **Terminal 1**: UR5e Driver Server
+- **Terminal 2**: Web dashboard development server
+- **Terminal 3**: Camera TF static publisher
+
+At the terminal that ran the script, the full klotski system will launch after 5-10 seconds.
+
 > To access the dashboard, open <http://localhost:3000> in your browser.
+
+The system should be running with all nodes launched. Now you can ask the klotski system to solve the puzzle by:
+1. Set initial board state on the physical board
+2. Setting the goal board state via the dashboard's Goal Editor
+3. Clicking "Auto" or "Step" in the Control Panel
+4. Observing the robot manipulate the pieces to solve the puzzle
 
 ## 🔧 Development
 
@@ -330,25 +411,20 @@ ros2 service call /plan/solve klotski_interfaces/srv/SolveBoard "{...}"
 ros2 action send_goal /arm_manipulation/move_piece klotski_interfaces/action/MovePiece "{...}"
 ```
 
-### Camera Calibration
-
-Use the calibration script to determine camera-to-robot transform:
-
-```bash
-python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode preview
-python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode collect --samples 20
-python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode compute
-```
-
-See `docs/CAMERA_CALIBRATION.md` for detailed instructions.
-
 ## 📈 Results and Demonstration
 
-TODO
+- Describe how your system performs against its design goals.
+- Include quantitative results where possible (e.g. accuracy, repeatability).
+- Provide photos, figures, or videos showing the system in operation. (See Project
+Overview, above.)
+- Highlight robustness, adaptability, and innovation.
 
 ## 💬 Discussion and Future Work
 
-TODO
+- Briefly discuss major engineering challenges faced and how they were addressed.
+- Outline opportunities for improvement or extensions – what would you do better for
+“Version 2.0”.
+- Summarise what makes your approach novel, creative, or particularly effective.
 
 ## 👥 Contributors and Roles
 
