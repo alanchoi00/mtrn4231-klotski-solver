@@ -803,7 +803,7 @@ Main launch configuration for the complete system.
 ### Acknowledgements
 We would like to thank our tutor, David Nie, for his careful guidance and dedicated support throughout our project. David provided us with many valuable suggestions that greatly improved our work. 
 
-We would also like to thank our course convenor, Will Midgely, for providing the project topic and for his support during the course.
+We would also like to thank our course convenor, Will Midgley, for providing the project topic and for his support during the course.
 
 ## Drawings
 ![acrylic drawing](Drawings/acrylic_parts.png)
