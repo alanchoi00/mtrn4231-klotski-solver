@@ -479,6 +479,11 @@ The system demonstrated successful integration of all software components. The c
 “Version 2.0”.
 - Summarise what makes your approach novel, creative, or particularly effective.
 
+### Major Challenge for Arm Manipulator
+The path planning in MoveIt often failed and took a long time to compute. To improve robustness, we decided to use joint-space planning with joint constraints as our main strategy, and only use Cartesian planning for short, local motions.
+
+To get the Real-time visualisation of the board coordinates for arm manipulator is also a challenge. Once the detected board pose has an offset, the target pose of the end-effector will be shifted as well, which can cause the whole process to fail. To solve this, we introduced an ArUco offset to correct the marker pose in the base_link frame, so that the estimated board coordinates remain accurate.
+
 ## 👥 Contributors and Roles
 
 - @alanchoi00 - Project Lead, System Architecture, Brain Node, UI Dashboard, Plan Node, Hand Safety Node
