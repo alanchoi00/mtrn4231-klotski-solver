@@ -38,11 +38,11 @@ The system continuously observes a physical Klotski board, tracks the board stat
 
 ### Package-Level Interaction
 
-<iframe frameborder="2" style="width:100%;height:500px;" src="https://viewer.diagrams.net/?tags=%7B%7D&lightbox=1&highlight=0000ff&edit=_blank&layers=1&nav=1&title=system_architecture.drawio&dark=auto#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Falanchoi00%2Fmtrn4231-klotski-solver%2FFinal_README%2Fsystem_architecture.drawio"></iframe>
+![Package Interaction Diagram](Images/Package_Interaction_Diagram.svg)
 
 > *Interactive diagram generated with [draw.io](https://app.diagrams.net/).*
 
-### Behaviour tree
+### Behaviour Tree
 
 Below is a high-level flowchart of the system's operational loop:
 
