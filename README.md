@@ -36,6 +36,11 @@
     - [Building Individual Packages](#building-individual-packages)
     - [ROS2 Commands](#ros2-commands)
   - [📈 Results and Demonstration](#-results-and-demonstration)
+    - [Working Components](#working-components)
+    - [Known Issues](#known-issues)
+      - [ArUco TF Frame Inaccuracy](#aruco-tf-frame-inaccuracy)
+      - [Path Planning Failures](#path-planning-failures)
+    - [Demonstration Outcome](#demonstration-outcome)
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
   - [👥 Contributors and Roles](#-contributors-and-roles)
   - [📁 Repository Structure](#-repository-structure)
@@ -49,6 +54,8 @@
     - [`dashboard_app/`](#dashboard_app)
     - [`src/launch/`](#srclaunch)
   - [🗿 References and Acknowledgements](#-references-and-acknowledgements)
+    - [References](#references)
+    - [Acknowledgements](#acknowledgements)
   - [📄 License](#-license)
 
 
@@ -423,11 +430,47 @@ ros2 action send_goal /arm_manipulation/move_piece klotski_interfaces/action/Mov
 
 ## 📈 Results and Demonstration
 
-- Describe how your system performs against its design goals.
-- Include quantitative results where possible (e.g. accuracy, repeatability).
-- Provide photos, figures, or videos showing the system in operation. (See Project
-Overview, above.)
-- Highlight robustness, adaptability, and innovation.
+### Working Components
+
+During the demonstration, the following components performed successfully:
+
+- **Dashboard UI**: The web-based dashboard provided real-time control and visualisation. Mode switching (auto/step/pause/reset), goal state editing, and HSV color tuning all functioned correctly.
+- **Brain Node**: The central orchestrator successfully managed the sense-plan-act loop, handled UI commands, and coordinated the 5-phase manipulation sequence through the Chain of Responsibility pipeline.
+- **Plan Node**: The BFS-based solver correctly computed optimal move sequences from the current board state to the goal configuration.
+- **Sense Node (Color Detection)**: The adjustable HSV color masking via the dashboard allowed accurate detection of all piece colors. The board state was correctly reconstructed from the camera image, with the correct number and positions of pieces identified.
+- **Hand Safety Node**: MediaPipe hand detection and safety zone monitoring worked as expected, pausing operations when hands entered the ROI.
+
+### Known Issues
+
+#### ArUco TF Frame Inaccuracy
+
+The sense node's published ArUco marker TF frames exhibited positional offsets from their true world positions. This is likely due to:
+
+1. **Camera intrinsic calibration drift**: The `cv2.solvePnP` function relies on accurate camera intrinsics (`fx`, `fy`, `ppx`, `ppy`, distortion coefficients). Small errors in these parameters—especially from factory defaults or environmental changes (temperature, focus)—propagate into the estimated marker pose.
+2. **Hand-eye calibration residual error**: The static transform from `camera_link` to `base_link` (hand-eye calibration) may contain residual errors that compound with marker pose estimation.
+3. **Marker size precision**: The configured marker length (65mm) must exactly match the physical markers; even 1-2mm discrepancy causes proportional depth errors in `solvePnP`.
+
+As a result, the `klotski_board` frame published by the sense node did not align precisely with the physical board, causing the arm to target incorrect world positions.
+
+#### Path Planning Failures
+
+The MoveIt2-based arm manipulation node experienced intermittent planning failures. Contributing factors include:
+
+1. **Constrained joint space**: The planner uses joint constraints (elbow, shoulder, wrist limits) to reduce the search space. While this speeds up planning for valid poses, it can cause failures when the target pose requires configurations outside these bounds.
+2. **Cartesian path threshold**: The planner requires >70% (`cartesian_fraction_threshold`) of the Cartesian path to be achievable. For certain cell positions—especially near board edges or when the arm is in awkward configurations—this threshold may not be met.
+3. **RRTConnect randomness**: The default `RRTConnectkConfigDefault` planner is probabilistically complete but not deterministic—repeated attempts with identical goals may yield different success rates.
+
+### Demonstration Outcome
+
+The system demonstrated successful integration of all software components. The closed-loop sense-plan-act architecture was validated: the brain node correctly triggered camera captures, the plan node computed solutions, and the UI displayed real-time state. However, full autonomous puzzle solving was not achieved due to the ArUco TF frame offsets causing the arm to miss target piece positions.
+
+<!-- TODO: Add demonstration video (10-30s showing one full cycle) -->
+<!-- TODO: Add screenshots of:
+  - Dashboard UI in operation
+  - RViz visualization showing TF frames
+  - Camera feed with ArUco detection overlay
+  - Board state detection result
+-->
 
 ## 💬 Discussion and Future Work
 
