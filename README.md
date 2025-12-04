@@ -1,18 +1,51 @@
 # MTRN4231 Klotski Solver
 
-## Table of Contents
+- [MTRN4231 Klotski Solver](#mtrn4231-klotski-solver)
+  - [📋 Overview](#-overview)
+  - [🏗️ System Architecture](#️-system-architecture)
+    - [RQT Node Graph](#rqt-node-graph)
+    - [Package-Level Interaction](#package-level-interaction)
+    - [Behaviour Tree](#behaviour-tree)
+      - [Closed-Loop Operation](#closed-loop-operation)
+      - [Brain Node](#brain-node)
+      - [Sense Node](#sense-node)
+      - [Hand Safety Node](#hand-safety-node)
+      - [Plan Node](#plan-node)
+      - [Arm Manipulation Node](#arm-manipulation-node)
+      - [Gripper Manipulation Node](#gripper-manipulation-node)
+    - [Custom ROS2 Interfaces](#custom-ros2-interfaces)
+  - [🔧 Technical Components](#-technical-components)
+    - [Computer Vision](#computer-vision)
+    - [Custom End Effector](#custom-end-effector)
+    - [Closed-Loop Operation](#closed-loop-operation-1)
+  - [🚀 Installation and Setup](#-installation-and-setup)
+    - [Prerequisites](#prerequisites)
+      - [System Requirements](#system-requirements)
+      - [Required ROS2 Packages](#required-ros2-packages)
+      - [Python Dependencies](#python-dependencies)
+    - [1. Clone and Build ROS Workspace](#1-clone-and-build-ros-workspace)
+    - [2. Install Dashboard Dependencies](#2-install-dashboard-dependencies)
+  - [⚙️ Running the System](#️-running-the-system)
+  - [🔧 Development](#-development)
+    - [Building Individual Packages](#building-individual-packages)
+    - [ROS2 Commands](#ros2-commands)
+    - [Camera Calibration](#camera-calibration)
+  - [📈 Results and Demonstration](#-results-and-demonstration)
+  - [💬 Discussion and Future Work](#-discussion-and-future-work)
+  - [👥 Contributors and Roles](#-contributors-and-roles)
+  - [📁 Repository Structure](#-repository-structure)
+    - [`klotski_utils/`](#klotski_utils)
+    - [`pkg_brain/`](#pkg_brain)
+    - [`pkg_sense/`](#pkg_sense)
+    - [`pkg_plan/`](#pkg_plan)
+    - [`pkg_manipulation/`](#pkg_manipulation)
+    - [`gripper_description/`](#gripper_description)
+    - [`ur_with_gripper_description/`](#ur_with_gripper_description)
+    - [`dashboard_app/`](#dashboard_app)
+    - [`src/launch/`](#srclaunch)
+  - [🗿 References and Acknowledgements](#-references-and-acknowledgements)
+  - [📄 License](#-license)
 
-- [Overview](#-overview)
-- [System Architecture](#️-system-architecture)
-- [Technical Components](#-technical-components)
-- [Installation and Setup](#-installation-and-setup)
-- [Running the System](#️-running-the-system)
-- [Development](#-development)
-- [Results and Demonstration](#-results-and-demonstration)
-- [Discussion and Future Work](#-discussion-and-future-work)
-- [Contributors and Roles](#-contributors-and-roles)
-- [Repository Structure](#-repository-structure)
-- [References and Acknowledgements](#-references-and-acknowledgements)
 
 A ROS2-based robotic system for solving the Klotski sliding puzzle using computer vision, path planning, and robotic manipulation with a UR5e robot arm.
 
@@ -48,21 +81,53 @@ Below is a high-level flowchart of the system's operational loop:
 
 ```mermaid
 flowchart TD
-    A[Camera] -->|Capture on trigger| B[Process image]
-    B -->|Detect puzzle & pieces → world coords tf2| C{Are pieces in expected place?}
-    C -->|No| D[Re-run Klotski algorithm]
-    D --> E[List of next moves]
-    C -->|Yes| E
-    E --> F[Translate next move to arm manipulation tf2]
-    F --> G[Closed-loop pick and place for 1 move]
-    G -->|Success| H[Trigger camera for next photo]
-    G -->|Failure or misplacement| D
-    H --> B
+    subgraph Safety["Safety Monitor (Parallel)"]
+        S1[Camera Feed] --> S2{Hand in Safety Zone?}
+        S2 -->|Yes| S3[Publish Stop Signal]
+        S3 --> S4[Pause Arm & Save Phase]
+        S2 -->|No for N frames| S5[Clear Stop Signal]
+        S5 --> S6[Resume from Retreat Phase]
+    end
+
+    subgraph Main["Main Execution Loop"]
+        A[Trigger Camera Capture] --> B[Process Image]
+        B -->|ArUco + HSV Detection| C[Sense Board State]
+        C --> D{Matches Expected State?}
+        D -->|No| E[Request Replan via BFS Solver]
+        D -->|Yes| F[Use Existing Plan]
+        E --> G[Get Next Move from Plan]
+        F --> G
+        G --> H[Approach Piece]
+        H --> I[Close Gripper]
+        I --> J[Pick & Place Piece]
+        J --> K[Open Gripper]
+        K --> L[Retreat to Home]
+        L --> M{More Moves?}
+        M -->|Yes| A
+        M -->|No| N[Goal Reached]
+    end
+
+    S4 -.->|Interrupts| H
+    S4 -.->|Interrupts| J
+    S6 -.->|Resumes| L
 ```
 
-### Node Overview
+#### Closed-Loop Operation
 
-TODO
+#### Brain Node
+The central orchestrator that coordinates all system operations through a modular manager architecture. It manages the complete sense-plan-act loop using a 5-phase manipulation sequence (Sense -> Plan -> Approach -> Grip Close -> Pick/Place -> Grip Open -> Retreat). The node handles UI commands for mode switching (auto/step/pause/reset), subscribes to board state updates from the sense node, integrates with the safety system to pause/resume operations when hands are detected, and delegates tasks to specialized managers (UIManager, ServiceManager, ActionExecutor, PipelineOrchestrator). The pipeline orchestrator implements a **Chain of Responsibility pattern** where handlers are processed sequentially, each deciding whether to handle the current state or pass to the next handler in the chain.
+
+#### Sense Node
+
+#### Hand Safety Node
+Monitors the camera feed for human hands using [MediaPipe Hands detection](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker). When hands are detected within a configurable polygon ROI (safety zone), it immediately publishes a stop signal on `/safety/stop`. The safety stop clears after a configurable number of consecutive frames without hands, allowing automatic resumption of operations. Provides services for dynamically adjusting the safety zone via the dashboard.
+
+#### Plan Node
+A C++ ROS2 service node that implements the Klotski puzzle solver using BFS (Breadth-First Search) to find the optimal (shortest) sequence of moves from the current board state to the goal configuration. It accepts `SolveBoard` service requests and returns a `MoveList` containing the solution path. The solver operates on a grid representation, identifying pieces by type (1×1, 1×2, 2×1, 2×2) and computing valid sliding moves.
+
+#### Arm Manipulation Node
+
+#### Gripper Manipulation Node
 
 ### Custom ROS2 Interfaces
 
@@ -115,7 +180,7 @@ The system defines several custom ROS2 messages, services, and actions to facili
 
 ## 🔧 Technical Components
 
-### Computer Vision Pipeline
+### Computer Vision
 
 The vision pipeline consists of four major stages:
 
@@ -138,7 +203,7 @@ The vision pipeline consists of four major stages:
    - In Klotski, this mapping is **injective** - each color configuration uniquely determines piece arrangement
    - Sliding-window detection identifies connected shapes
 
-### End Effector
+### Custom End Effector
 
 The custom end effector is a parallel gripper driven by a single servo motor. It consists primarily of laser-cut acrylic sheet and plywood.
 
@@ -146,16 +211,12 @@ The custom end effector is a parallel gripper driven by a single servo motor. It
 
 - **Control**: Arduino-based serial communication
 - **Actuation**: Single servo motor for parallel jaw movement
-- **Feedback**: Contact state detection
+- **Mounting**: Attaches to UR5e wrist via standard flange
+- TODO: Add more details and images
 
-### Safety System
+### Closed-Loop Operation
 
-Hand detection-based safety monitoring:
-
-- MediaPipe Hands for real-time hand detection
-- Configurable safety zone (ROI polygon)
-- Immediate arm stop when hands detected in zone
-- Automatic resume after hands clear for configurable frames
+The system employs two closed-loop feedback mechanisms to ensure robust and safe execution. **Visual feedback** verifies manipulation accuracy—after each move phase, the brain node triggers a camera capture and compares the sensed board state against the **expected state** (derived by applying the intended move). If they match, execution proceeds; if not, the system automatically **replans** from the actual state to the goal, handling slippage, incomplete moves, or external interference. In parallel, a **safety feedback loop** continuously monitors for human hands via MediaPipe. When hands enter the configurable safety zone, an immediate stop signal pauses the arm and saves the current phase. Once hands clear for a set number of frames, the system resumes from a safe retreat position, allowing operators to intervene without disabling the robot.
 
 ## 🚀 Installation and Setup
 
@@ -405,7 +466,7 @@ Shared Python utilities across packages.
 
 - UI mode management (auto/step/pause/reset)
 - Pipeline orchestration through handler chain
-- 5-phase manipulation execution (IDLE → APPROACH → PICK_PLACE → RETREAT)
+- 5-phase manipulation execution (IDLE -> APPROACH -> PICK_PLACE -> RETREAT)
 - Safety stop integration
 
 **Subscriptions:**
