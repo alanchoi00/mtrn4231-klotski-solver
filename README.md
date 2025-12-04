@@ -17,6 +17,7 @@
   - [🔧 Technical Components](#-technical-components)
     - [Computer Vision](#computer-vision)
     - [Custom End Effector](#custom-end-effector)
+    - [System Visualisation](#system-visualisation)
     - [Closed-Loop Operation](#closed-loop-operation-1)
   - [🚀 Installation and Setup](#-installation-and-setup)
     - [Prerequisites](#prerequisites)
@@ -42,7 +43,7 @@
       - [Path Planning Failures](#path-planning-failures)
     - [Demonstration Outcome](#demonstration-outcome)
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
-    - [Major Challenge for Arm Manipulator](#major-challenge-for-arm-manipulator)
+    - [Engineering Challenges and How They Were Addressed](#engineering-challenges-and-how-they-were-addressed)
   - [👥 Contributors and Roles](#-contributors-and-roles)
   - [📁 Repository Structure](#-repository-structure)
     - [`klotski_utils/`](#klotski_utils)
@@ -65,14 +66,14 @@ A ROS2-based robotic system for solving the Klotski sliding puzzle using compute
 
 ## 📋 Overview
 
-Klotski is a classic sliding-block puzzle in which blocks of varying sizes (1×1, 1×2, 2×1, and 2×2) must be maneuvered within a 4×5 confined board. The traditional objective is to guide the largest 2×2 block to the exit at the bottom.
+This project delivers an interactive robotic system designed to support young learners in developing spatial reasoning and problem-solving skills through the classic Klotski sliding-block puzzle. The puzzle consists of blocks of various sizes (1×1, 1×2, 2×1, 2×2) arranged on a confined 4×5 board. The robot solves the puzzle by guiding the board from any starting configuration to a chosen target pattern, reinforcing pattern recognition and strategic thinking.
 
-This project implements an automated Klotski puzzle solver that:
+Our system enables children to engage with the puzzle while the robot demonstrates clear reasoning, safe manipulation, and transparent decision-making. The robot:
 
 - **Senses**: Uses computer vision to detect the current puzzle state and board position via ArUco markers
 - **Plans**: Generates optimal move sequences using BFS-based path planning to reach the goal configuration
-- **Acts**: Controls a UR5e robotic arm with a custom gripper to physically manipulate puzzle pieces
-- **Monitors**: Provides a web-based dashboard for real-time control, visualization, and safety monitoring
+- **Acts**: Executes moves using a UR5e robotic arm equipped with a custom end effector designed for safe, reliable interaction around children
+- **Monitors**: Provides a web-based dashboard for real-time control, visualization and safety monitoring
 
 The system continuously observes a physical Klotski board, tracks the board state, and when prompted, computes the shortest sequence of moves needed to reach a specified goal state. It can provide single-step hints or execute complete solutions autonomously.
 
@@ -132,6 +133,7 @@ flowchart TD
 The central orchestrator that coordinates all system operations through a modular manager architecture. It manages the complete sense-plan-act loop using a 5-phase manipulation sequence (Sense -> Plan -> Approach -> Grip Close -> Pick/Place -> Grip Open -> Retreat). The node handles UI commands for mode switching (auto/step/pause/reset), subscribes to board state updates from the sense node, integrates with the safety system to pause/resume operations when hands are detected, and delegates tasks to specialised managers (UIManager, ServiceManager, ActionExecutor, PipelineOrchestrator). The pipeline orchestrator implements a **Chain of Responsibility pattern** where handlers are processed sequentially, each deciding whether to handle the current state or pass to the next handler in the chain.
 
 #### Sense Node
+An action service that processes data from the overhead RealSense camera to detect ArUco markers, compute the board pose, warp the image to a top-down view and classify each cell using HSV colour masks. It reconstructs the full Klotski board layout and publishes a BoardState message and TF frame to assist with the closed-loop planning and manipulation.
 
 #### Hand Safety Node
 Monitors the camera feed for human hands using [MediaPipe Hands detection](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker). When hands are detected within a configurable polygon ROI (safety zone), it immediately publishes a stop signal on `/safety/stop`. The safety stop clears after a configurable number of consecutive frames without hands, allowing automatic resumption of operations. Provides services for dynamically adjusting the safety zone via the dashboard.
@@ -214,9 +216,9 @@ The vision pipeline consists of four major stages:
    - Configurable via dashboard color masker tool
 
 4. **Board State Reconstruction**
-   - Grid colors are converted to piece positions
+   - Groups neighbouring cells of the same colour to recover each Klotski piece shape 
    - In Klotski, this mapping is **injective** - each color configuration uniquely determines piece arrangement
-   - Sliding-window detection identifies connected shapes
+
 
 ### Custom End Effector
 
@@ -228,6 +230,16 @@ The custom end effector is a parallel gripper driven by a single servo motor. It
 - **Actuation**: Single servo motor for parallel jaw movement
 - **Mounting**: Attaches to UR5e wrist via standard flange
 - TODO: Add more details and images
+  
+### System Visualisation
+
+Our system provides two layers of visualisation. The custom User Interface to present the puzzle goal state to clearly understand the robot’s intended solution path and progress. 
+
+In parallel, RViz is used to display the custom end effector model with its live orientation in the world, the TF poses of all four ArUco markers and the computed board pose to verify camera calibration and to confirm correct alignment between the computer vision and robot's coordinate system:
+
+![RVIZ Visualisation](images/rviz.jpg)
+
+Together, these visual tools support both user clarity and technical validation of the system.
 
 ### Closed-Loop Operation
 
@@ -482,10 +494,23 @@ The system demonstrated successful integration of all software components. The c
 “Version 2.0”.
 - Summarise what makes your approach novel, creative, or particularly effective.
 
-### Major Challenge for Arm Manipulator
-The path planning in MoveIt often failed and took a long time to compute. To improve robustness, we decided to use joint-space planning with joint constraints as our main strategy, and only use Cartesian planning for short distance movements.
+### Engineering Challenges and How They Were Addressed
 
-To get the real-time visualisation of the board coordinates for arm manipulator is also a challenge. Once the detected board pose has an offset, the target pose of the end-effector will be shifted as well, which can cause the whole process to fail. To solve this, we introduced an ArUco offset to correct the marker pose in the base_link frame, so that the estimated board coordinates remain accurate.
+**Perception Stability**
+
+Developing a fully closed-loop Klotski robot required overcoming several engineering challenges across computer vision, planning and manipulation. Achieving reliable perception was one of the most significant hurdles. Early testing showed that raw ArUco detections could fluctuate by several centimetres, leading to unstable board poses and unreliable planning. To address this, we combined the `cv2.solvePnP` and depth-based pose estimation with a multi-frame stability filter that rejects inconsistent readings and locks in a marker pose only when it converges within a tight threshold.
+
+**Colour-Based Piece Classification**
+
+Robust piece classification also posed difficulties due to colour variability, reflections, and shadows on the physical board. We addressed this by developing a carefully tuned HSV segmentation pipeline, producing clean masks and consistent grid-level classification across different lighting conditions.
+
+**Motion Planning Reliability**
+
+In the planning domain, MoveIt’s default Cartesian planner was often slow or prone to failure when generating full-board motions. To improve reliability, we shifted to joint-space planning with joint constraints as the primary strategy, reserving Cartesian motion for short, precise adjustments where straight-line movements were essential.
+
+**End Effector Design and Grasp Reliability**
+
+The end effector required several iterations to achieve reliable gripping across all piece types. We refined the gripper geometry, added sandpaper pads to increase friction, and introduced a spring mechanism to counteract backlash and improve grasp repeatability.
 
 ## 👥 Contributors and Roles
 
@@ -650,7 +675,7 @@ Shared Python utilities across packages.
 1. **ArUco Detection** - Detect 4 corner markers (IDs 0-3, DICT_4X4_50, 65mm)
 2. **Board Isolation** - Homography transform for top-down rectified view
 3. **Color Detection** - HSV masking for piece identification per grid cell
-4. **Board Reconstruction** - Sliding-window algorithm to identify pieces from colors
+4. **Board Reconstruction** - Merge same-colour cells into corresponding pieces
 
 **Subscriptions:**
 
