@@ -42,6 +42,7 @@
       - [Path Planning Failures](#path-planning-failures)
     - [Demonstration Outcome](#demonstration-outcome)
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
+    - [Major Challenge for Arm Manipulator](#major-challenge-for-arm-manipulator)
   - [👥 Contributors and Roles](#-contributors-and-roles)
   - [📁 Repository Structure](#-repository-structure)
     - [`klotski_utils/`](#klotski_utils)
@@ -56,6 +57,7 @@
   - [🗿 References and Acknowledgements](#-references-and-acknowledgements)
     - [References](#references)
     - [Acknowledgements](#acknowledgements)
+  - [Drawings](#drawings)
   - [📄 License](#-license)
 
 
