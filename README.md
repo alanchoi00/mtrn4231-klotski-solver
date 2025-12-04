@@ -382,8 +382,11 @@ At the terminal that ran the script, the full klotski system will launch after 5
 The system should be running with all nodes launched. Now you can ask the klotski system to solve the puzzle by:
 1. Set initial board state on the physical board
 2. Setting the goal board state via the dashboard's Goal Editor
-3. Clicking "Auto" or "Step" in the Control Panel
-4. Observing the robot manipulate the pieces to solve the puzzle
+
+https://github.com/user-attachments/assets/cdfe5b98-998a-4e49-b073-5e9aa610c3f1
+
+5. Clicking "Auto" or "Step" in the Control Panel
+6. Observing the robot manipulate the pieces to solve the puzzle
 
 ## 🔧 Development
 
