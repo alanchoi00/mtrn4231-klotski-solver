@@ -5,26 +5,11 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    OpaqueFunction,
     TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-
-
-def validate_launch_args(context, *args, **kwargs):
-    sim_value = context.launch_configurations.get("sim", "false").lower()
-    robot_ip_value = context.launch_configurations.get("robot_ip", "")
-
-    if sim_value == "false" and not robot_ip_value:
-        raise RuntimeError(
-            "robot_ip launch argument is required when sim:=false. "
-            "Please provide the IP address of your UR5e robot. "
-            "Usage: ros2 launch klotski.launch.py sim:=false robot_ip:=192.168.1.100"
-        )
-
-    return []
 
 
 def generate_launch_description():
@@ -81,13 +66,6 @@ def generate_launch_description():
                 default_value="true",
                 description="Whether to start web video server",
             ),
-            DeclareLaunchArgument(
-                "robot_ip",
-                default_value="",
-                description="IP address of the real UR5e robot (required when sim:=false)",
-            ),
-            # Validate launch arguments
-            OpaqueFunction(function=validate_launch_args),
             # ROS Bridge (optional)
             Node(
                 package="rosbridge_server",

@@ -1,0 +1,6 @@
+# Request to get current ArUco offsets
+---
+# Response with current offsets
+klotski_interfaces/ArucoOffsets offsets
+bool ok
+string message

@@ -4,7 +4,7 @@ sense:
     board_width_cells: 4
     board_height_cells: 5
 
-    min_cell_colour_area: 500 # Minimum area in pixels for a cell's color to be considered valid
+    min_cell_colour_area: 300 # Minimum area in pixels for a cell's color to be considered valid
 
     # Camera frame IDs
     camera_frame_id: "camera_color_optical_frame"
@@ -22,9 +22,16 @@ sense:
     board_br_marker_id: 3 # ID of the bottom-right corner marker on the board
     marker_length_m: 0.065 # marker side length in meters
 
-    # Board offset and frame ID
+    # ArUco frame correction offsets (in base_link frame, meters)
+    # Use these to correct systematic errors in depth-computed ArUco positions
+    aruco_offset_x_m: 0.07526   # X offset correction (positive = further from robot)
+    aruco_offset_y_m: 0.026514  # Y offset correction (positive = left of robot)
+    aruco_offset_z_m: 0.0       # Z offset correction (positive = up)
+
+    # Board offset from reference marker (in marker's local frame)
     board_offset_x_m: 0.040 # 40mm right (marker frame X)
     board_offset_y_m: 0.040 # 40mm up (marker frame Y)
+    board_rotation_offset_deg: 90.0 # Rotation offset around Z-axis in degrees (adjust if gripper orientation is off)
     board_frame_id: "klotski_board" # board frame ID (offset from bottom-left marker)
 
     board_piece_counts:
@@ -37,4 +44,3 @@ sense:
     world_frame_id: "base_link"
 
     hsv_config_file: "hsv_ranges.default.yaml" # omitted path is relative to src/pkg_sense/config/
-

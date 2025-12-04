@@ -23,6 +23,8 @@ export const TOPICS = {
   MASKED_IMAGE: "/sense/masked_image",
   /** HSV ranges configuration */
   HSV_RANGES: "/sense/hsv_ranges",
+  /** ArUco offsets configuration */
+  ARUCO_OFFSETS: "/sense/aruco_offsets",
 
   // Safety
   /** Safety stop signal (Bool) */
@@ -56,6 +58,12 @@ export const SERVICES = {
   RESET_HSV_RANGES: "/sense/reset_hsv_ranges",
   /** Export HSV ranges as YAML */
   EXPORT_HSV_RANGES_YAML: "/sense/export_hsv_ranges_yaml",
+
+  // ArUco Offsets Configuration
+  /** Get current ArUco offsets */
+  GET_ARUCO_OFFSETS: "/sense/get_aruco_offsets",
+  /** Set ArUco offsets */
+  SET_ARUCO_OFFSETS: "/sense/set_aruco_offsets",
 } as const;
 
 // =============================================================================
@@ -71,6 +79,10 @@ export const SERVICE_TYPES = {
   SET_HSV_RANGES: "klotski_interfaces/srv/SetHSVRanges",
   RESET_HSV_RANGES: "klotski_interfaces/srv/ResetHSVRanges",
   EXPORT_HSV_RANGES_YAML: "klotski_interfaces/srv/ExportHSVRangesYaml",
+
+  // ArUco Offsets Configuration
+  GET_ARUCO_OFFSETS: "klotski_interfaces/srv/GetArucoOffsets",
+  SET_ARUCO_OFFSETS: "klotski_interfaces/srv/SetArucoOffsets",
 } as const;
 
 // =============================================================================
@@ -79,6 +91,9 @@ export const SERVICE_TYPES = {
 export const MESSAGE_TYPES = {
   // HSV
   HSV_RANGES: "klotski_interfaces/msg/HSVRanges",
+
+  // ArUco
+  ARUCO_OFFSETS: "klotski_interfaces/msg/ArucoOffsets",
 
   // UI
   UI_COMMAND: "klotski_interfaces/msg/UICommand",

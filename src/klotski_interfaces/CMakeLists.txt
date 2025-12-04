@@ -24,6 +24,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ContactState.msg"
   "msg/HSVRange.msg"
   "msg/HSVRanges.msg"
+  "msg/ArucoOffsets.msg"
   "srv/SolveBoard.srv"
   "action/MovePiece.action"
   "srv/CaptureBoard.srv"
@@ -33,6 +34,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ResetHSVRanges.srv"
   "srv/GetSafetyZone.srv"
   "srv/SetSafetyZone.srv"
+  "srv/GetArucoOffsets.srv"
+  "srv/SetArucoOffsets.srv"
   "action/GripPiece.action"
   DEPENDENCIES geometry_msgs builtin_interfaces
 )
