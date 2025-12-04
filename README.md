@@ -335,11 +335,18 @@ Piece color detection ranges can be calibrated via the dashboard's **Color Maske
 2. Adjust HSV sliders while viewing the live camera feed
 3. Export calibrated ranges to `hsv_ranges.default.yaml`
 
+
+https://github.com/user-attachments/assets/11f03148-abe8-4c3c-a219-93e304ad4703
+
+
 #### Hand Safety Zone Calibration
 The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection Viewer**:
 1. Navigate to the Hand Detection Viewer tab
 2. Drag the polygon vertices to define the safety zone
 3. Changes are applied in real-time
+
+
+https://github.com/user-attachments/assets/712d131a-145f-48ba-b278-555adfbc1ae8
 
 ### Hardware Setup
 
