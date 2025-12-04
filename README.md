@@ -1,4 +1,15 @@
 # MTRN4231 Klotski Solver
+## Table of Contents
+- [Overview](#overview)
+- [System Architecture](#system-architecture)
+- [Technical Components](#technical-components)
+- [Installation and Setup](#installation-and-setup)
+- [Running the System](#running-the-system)
+- [Results and Demonstration](#results-and-demonstration)
+- [Discussion and Future Work](#discussion-and-future-work)
+- [Contributors and Roles](#contributors-and-roles)
+- [Repository Structure](#repository-structure)
+- [References](#references)
 
 A ROS2-based robotic system for solving the Klotski sliding puzzle using computer vision, path planning, and robotic manipulation with a UR5e robot arm.
 
