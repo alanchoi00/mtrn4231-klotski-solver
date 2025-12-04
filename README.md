@@ -138,11 +138,13 @@ An action service that processes data from the overhead RealSense camera to dete
 #### Hand Safety Node
 Monitors the camera feed for human hands using [MediaPipe Hands detection](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker). When hands are detected within a configurable polygon ROI (safety zone), it immediately publishes a stop signal on `/safety/stop`. The safety stop clears after a configurable number of consecutive frames without hands, allowing automatic resumption of operations. Provides services for dynamically adjusting the safety zone via the dashboard.
 
+![Hand Safety Demo](images/hand_safety_demo.gif)
+
 #### Plan Node
 A C++ ROS2 service node that finds the optimal move sequence to solve the Klotski puzzle. Given the current board state and a goal configuration via the `SolveBoard` service, it returns the shortest `MoveList` using **BFS** over the state-space graph. The solver represents the 4×5 board as a grid with four piece types (1×1, 1×2, 2×1, 2×2) and explores valid sliding moves. [Precomputed graph data](https://2swap.github.io/Klotski-Webpage/data.json) enumerating all 65,880 reachable configurations accelerates pathfinding.
 
 #### Arm Manipulation Node
-MoveIt is been used for control UR5e robot to approach, retreat, pick and place blocks on the Klotski Board. This node subscribes to the sense node to get the real-time board coordinates and received the command from plan node with the target piece and cell.   
+MoveIt is been used for control UR5e robot to approach, retreat, pick and place blocks on the Klotski Board. This node subscribes to the sense node to get the real-time board coordinates and received the command from plan node with the target piece and cell.
 
 #### Gripper Manipulation Node
 
@@ -153,45 +155,45 @@ The system defines several custom ROS2 messages, services, and actions to facili
 <details>
 <summary><strong>Messages</strong></summary>
 
-| Message | Description |
-|---------|-------------|
-| `Board.msg` | Board state with piece positions |
-| `BoardSpec.msg` | Board dimensions (4×5 grid) |
-| `BoardState.msg` | Complete board state with pose |
-| `Cell.msg` | Grid cell coordinates (col, row) |
-| `Piece.msg` | Piece definition (type, color, cells) |
-| `Move.msg` | Single move (piece + target cell) |
-| `MoveList.msg` | Sequence of moves |
-| `HSVRange.msg` | HSV color range for detection |
-| `HSVRanges.msg` | Multiple color ranges |
-| `GripperCommand.msg` | Gripper open/close commands |
-| `UICommand.msg` | Dashboard commands |
+| Message              | Description                           |
+| -------------------- | ------------------------------------- |
+| `Board.msg`          | Board state with piece positions      |
+| `BoardSpec.msg`      | Board dimensions (4×5 grid)           |
+| `BoardState.msg`     | Complete board state with pose        |
+| `Cell.msg`           | Grid cell coordinates (col, row)      |
+| `Piece.msg`          | Piece definition (type, color, cells) |
+| `Move.msg`           | Single move (piece + target cell)     |
+| `MoveList.msg`       | Sequence of moves                     |
+| `HSVRange.msg`       | HSV color range for detection         |
+| `HSVRanges.msg`      | Multiple color ranges                 |
+| `GripperCommand.msg` | Gripper open/close commands           |
+| `UICommand.msg`      | Dashboard commands                    |
 
 </details>
 
 <details>
 <summary><strong>Services</strong></summary>
 
-| Service | Description |
-|---------|-------------|
-| `SolveBoard.srv` | Request optimal path from current to goal state |
-| `CaptureBoard.srv` | Capture and return current board state |
-| `GetHSVRanges.srv` | Get current color detection ranges |
-| `SetHSVRanges.srv` | Update color detection ranges |
-| `ResetHSVRanges.srv` | Reset to default HSV ranges |
-| `ExportHSVRangesYaml.srv` | Export HSV config to YAML |
-| `GetSafetyZone.srv` | Get safety monitoring ROI |
-| `SetSafetyZone.srv` | Set safety monitoring ROI |
+| Service                   | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `SolveBoard.srv`          | Request optimal path from current to goal state |
+| `CaptureBoard.srv`        | Capture and return current board state          |
+| `GetHSVRanges.srv`        | Get current color detection ranges              |
+| `SetHSVRanges.srv`        | Update color detection ranges                   |
+| `ResetHSVRanges.srv`      | Reset to default HSV ranges                     |
+| `ExportHSVRangesYaml.srv` | Export HSV config to YAML                       |
+| `GetSafetyZone.srv`       | Get safety monitoring ROI                       |
+| `SetSafetyZone.srv`       | Set safety monitoring ROI                       |
 
 </details>
 
 <details>
 <summary><strong>Actions</strong></summary>
 
-| Action | Description |
-|--------|-------------|
+| Action             | Description                           |
+| ------------------ | ------------------------------------- |
 | `MovePiece.action` | Execute 5-phase manipulation sequence |
-| `GripPiece.action` | Open/close gripper |
+| `GripPiece.action` | Open/close gripper                    |
 
 </details>
 
@@ -216,7 +218,7 @@ The vision pipeline consists of four major stages:
    - Configurable via dashboard color masker tool
 
 4. **Board State Reconstruction**
-   - Groups neighbouring cells of the same colour to recover each Klotski piece shape 
+   - Groups neighbouring cells of the same colour to recover each Klotski piece shape
    - In Klotski, this mapping is **injective** - each color configuration uniquely determines piece arrangement
 
 
@@ -230,10 +232,12 @@ The custom end effector is a parallel gripper driven by a single servo motor. It
 - **Actuation**: Single servo motor for parallel jaw movement
 - **Mounting**: Attaches to UR5e wrist via standard flange
 - TODO: Add more details and images
-  
+
 ### System Visualisation
 
-Our system provides two layers of visualisation. The custom User Interface to present the puzzle goal state to clearly understand the robot’s intended solution path and progress. 
+Our system provides two layers of visualisation. The custom User Interface to present the puzzle goal state to clearly understand the robot’s intended solution path and progress.
+
+![Dashboard UI](images/dashboard_ui.png)
 
 In parallel, RViz is used to display the custom end effector model with its live orientation in the world, the TF poses of all four ArUco markers and the computed board pose to verify camera calibration and to confirm correct alignment between the computer vision and robot's coordinate system:
 
@@ -308,23 +312,23 @@ npm install
 
 The system uses YAML configuration files located in each package's `config/` directory. Key parameters can be adjusted without rebuilding:
 
-| Config File | Description |
-|-------------|-------------|
-| `pkg_brain/config/brain.config.yaml` | Delay between moves, timing parameters |
-| `pkg_manipulation/config/arm.config.yaml` | MoveIt planning parameters, velocity/acceleration limits, board geometry, height offsets |
-| `pkg_manipulation/config/gripper.config.yaml` | Serial port, baud rate, gripper timing |
-| `pkg_sense/config/sense.config.yaml` | Board dimensions, ArUco marker IDs/sizes, frame IDs, piece color counts |
-| `pkg_sense/config/hand_safety.config.yaml` | Detection confidence, safety zone ROI polygon, clear-after-frames threshold |
-| `pkg_sense/config/hsv_ranges.default.yaml` | HSV color ranges for piece detection (can be tuned via dashboard) |
+| Config File                                   | Description                                                                              |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pkg_brain/config/brain.config.yaml`          | Delay between moves, timing parameters                                                   |
+| `pkg_manipulation/config/arm.config.yaml`     | MoveIt planning parameters, velocity/acceleration limits, board geometry, height offsets |
+| `pkg_manipulation/config/gripper.config.yaml` | Serial port, baud rate, gripper timing                                                   |
+| `pkg_sense/config/sense.config.yaml`          | Board dimensions, ArUco marker IDs/sizes, frame IDs, piece color counts                  |
+| `pkg_sense/config/hand_safety.config.yaml`    | Detection confidence, safety zone ROI polygon, clear-after-frames threshold              |
+| `pkg_sense/config/hsv_ranges.default.yaml`    | HSV color ranges for piece detection (can be tuned via dashboard)                        |
 
 #### Environment Variables
 
 The launch scripts use the following defaults that can be overridden:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ROBOT_IP` | `192.168.0.100` | UR5e robot IP address |
-| Camera TF | See below | Camera-to-base transform (hand-eye calibration result) |
+| Variable   | Default         | Description                                            |
+| ---------- | --------------- | ------------------------------------------------------ |
+| `ROBOT_IP` | `192.168.0.100` | UR5e robot IP address                                  |
+| Camera TF  | See below       | Camera-to-base transform (hand-eye calibration result) |
 
 ### 4. Camera Calibration
 
@@ -358,7 +362,7 @@ Piece color detection ranges can be calibrated via the dashboard's **Color Maske
 3. Export calibrated ranges to `hsv_ranges.default.yaml`
 
 
-https://github.com/user-attachments/assets/11f03148-abe8-4c3c-a219-93e304ad4703
+![HSV Color Calibration](images/hsv_color_calibration_demo.gif)
 
 
 #### Hand Safety Zone Calibration
@@ -368,7 +372,7 @@ The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection V
 3. Changes are applied in real-time
 
 
-https://github.com/user-attachments/assets/712d131a-145f-48ba-b278-555adfbc1ae8
+![Hand Safety Zone Calibration](images/hand_safety_zone_calibration_demo.gif)
 
 ### Hardware Setup
 
@@ -404,11 +408,9 @@ At the terminal that ran the script, the full klotski system will launch after 5
 The system should be running with all nodes launched. Now you can ask the klotski system to solve the puzzle by:
 1. Set initial board state on the physical board
 2. Setting the goal board state via the dashboard's Goal Editor
-
-https://github.com/user-attachments/assets/cdfe5b98-998a-4e49-b073-5e9aa610c3f1
-
-5. Clicking "Auto" or "Step" in the Control Panel
-6. Observing the robot manipulate the pieces to solve the puzzle
+   ![Goal Editor](images/goal_editor_demo.gif)
+3. Clicking "Auto" or "Step" in the Control Panel
+4. Observing the robot manipulate the pieces to solve the puzzle
 
 ## 🔧 Development
 
@@ -633,31 +635,31 @@ Shared Python utilities across packages.
 
 **Subscriptions:**
 
-| Topic | Type | Description |
-|-------|------|-------------|
+| Topic          | Type         | Description                |
+| -------------- | ------------ | -------------------------- |
 | `/board_state` | `BoardState` | Current sensed board state |
-| `/ui/cmd` | `UICommand` | Dashboard commands |
-| `/ui/goal` | `BoardState` | User-defined goal state |
-| `/safety/stop` | `Bool` | Emergency stop signal |
+| `/ui/cmd`      | `UICommand`  | Dashboard commands         |
+| `/ui/goal`     | `BoardState` | User-defined goal state    |
+| `/safety/stop` | `Bool`       | Emergency stop signal      |
 
 **Publications:**
 
-| Topic | Type | Description |
-|-------|------|-------------|
+| Topic        | Type     | Description                  |
+| ------------ | -------- | ---------------------------- |
 | `/ui/events` | `String` | Status updates for dashboard |
 
 **Service Clients:**
 
-| Service | Type | Description |
-|---------|------|-------------|
+| Service       | Type         | Description           |
+| ------------- | ------------ | --------------------- |
 | `/plan/solve` | `SolveBoard` | Request path planning |
 
 **Action Clients:**
 
-| Action | Type | Description |
-|--------|------|-------------|
-| `/arm_manipulation/move_piece` | `MovePiece` | Arm manipulation |
-| `/gripper_manipulation/grip_piece` | `GripPiece` | Gripper control |
+| Action                             | Type        | Description      |
+| ---------------------------------- | ----------- | ---------------- |
+| `/arm_manipulation/move_piece`     | `MovePiece` | Arm manipulation |
+| `/gripper_manipulation/grip_piece` | `GripPiece` | Gripper control  |
 
 ### `pkg_sense/`
 
@@ -665,10 +667,10 @@ Shared Python utilities across packages.
 
 **Nodes:**
 
-| Node | Description |
-|------|-------------|
-| `sense` | Main sensing node - ArUco detection, board isolation, color detection |
-| `hand_safety_monitor` | Hand detection for safety stopping using MediaPipe |
+| Node                  | Description                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| `sense`               | Main sensing node - ArUco detection, board isolation, color detection |
+| `hand_safety_monitor` | Hand detection for safety stopping using MediaPipe                    |
 
 **Vision Pipeline:**
 
@@ -679,35 +681,35 @@ Shared Python utilities across packages.
 
 **Subscriptions:**
 
-| Topic | Type | Description |
-|-------|------|-------------|
-| `/camera/camera/color/image_raw` | `Image` | Camera feed |
+| Topic                              | Type         | Description       |
+| ---------------------------------- | ------------ | ----------------- |
+| `/camera/camera/color/image_raw`   | `Image`      | Camera feed       |
 | `/camera/camera/color/camera_info` | `CameraInfo` | Camera intrinsics |
 
 **Publications:**
 
-| Topic | Type | Description |
-|-------|------|-------------|
-| `/board_state` | `BoardState` | Detected board state with pose |
-| `/safety/stop` | `Bool` | Hand detection safety signal |
-| `/safety/hand_detection_image` | `Image` | Annotated hand detection feed |
+| Topic                          | Type         | Description                    |
+| ------------------------------ | ------------ | ------------------------------ |
+| `/board_state`                 | `BoardState` | Detected board state with pose |
+| `/safety/stop`                 | `Bool`       | Hand detection safety signal   |
+| `/safety/hand_detection_image` | `Image`      | Annotated hand detection feed  |
 
 **TF Broadcasts:**
 
-| Frame | Parent | Description |
-|-------|--------|-------------|
-| `aruco_X` | `camera_color_optical_frame` | Individual marker poses |
-| `board` | `base_link` | Board origin (bottom-left corner) |
+| Frame     | Parent                       | Description                       |
+| --------- | ---------------------------- | --------------------------------- |
+| `aruco_X` | `camera_color_optical_frame` | Individual marker poses           |
+| `board`   | `base_link`                  | Board origin (bottom-left corner) |
 
 **Services:**
 
-| Service | Type | Description |
-|---------|------|-------------|
-| `/sense/capture_board` | `CaptureBoard` | Capture current state |
-| `/sense/get_hsv_ranges` | `GetHSVRanges` | Get color ranges |
-| `/sense/set_hsv_ranges` | `SetHSVRanges` | Set color ranges |
-| `/safety/get_zone` | `GetSafetyZone` | Get safety ROI |
-| `/safety/set_zone` | `SetSafetyZone` | Set safety ROI |
+| Service                 | Type            | Description           |
+| ----------------------- | --------------- | --------------------- |
+| `/sense/capture_board`  | `CaptureBoard`  | Capture current state |
+| `/sense/get_hsv_ranges` | `GetHSVRanges`  | Get color ranges      |
+| `/sense/set_hsv_ranges` | `SetHSVRanges`  | Set color ranges      |
+| `/safety/get_zone`      | `GetSafetyZone` | Get safety ROI        |
+| `/safety/set_zone`      | `SetSafetyZone` | Set safety ROI        |
 
 ### `pkg_plan/`
 
@@ -723,8 +725,8 @@ Shared Python utilities across packages.
 
 **Services:**
 
-| Service | Type | Description |
-|---------|------|-------------|
+| Service       | Type         | Description          |
+| ------------- | ------------ | -------------------- |
 | `/plan/solve` | `SolveBoard` | Compute optimal path |
 
 ### `pkg_manipulation/`
@@ -733,9 +735,9 @@ Shared Python utilities across packages.
 
 **Nodes:**
 
-| Node | Description |
-|------|-------------|
-| `arm_manipulator` | MoveIt-based arm motion planning and execution (C++) |
+| Node                  | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `arm_manipulator`     | MoveIt-based arm motion planning and execution (C++) |
 | `gripper_manipulator` | Arduino-controlled servo gripper via serial (Python) |
 
 **Arm Manipulator Features:**
@@ -748,10 +750,10 @@ Shared Python utilities across packages.
 
 **Action Servers:**
 
-| Action | Type | Description |
-|--------|------|-------------|
-| `/arm_manipulation/move_piece` | `MovePiece` | 5-phase manipulation |
-| `/gripper_manipulation/grip_piece` | `GripPiece` | Gripper control |
+| Action                             | Type        | Description          |
+| ---------------------------------- | ----------- | -------------------- |
+| `/arm_manipulation/move_piece`     | `MovePiece` | 5-phase manipulation |
+| `/gripper_manipulation/grip_piece` | `GripPiece` | Gripper control      |
 
 **5-Phase Manipulation Sequence:**
 
@@ -791,12 +793,12 @@ Combined URDF for UR5e robot with custom gripper attached.
 
 **Key Components:**
 
-| Component | Description |
-|-----------|-------------|
-| `ControlPanel` | Mode buttons and system control |
-| `GoalEditor` | Interactive goal state configuration |
-| `ColourMasker` | HSV range adjustment with live preview |
-| `HandDetectionViewer` | Safety zone visualization and editing |
+| Component             | Description                            |
+| --------------------- | -------------------------------------- |
+| `ControlPanel`        | Mode buttons and system control        |
+| `GoalEditor`          | Interactive goal state configuration   |
+| `ColourMasker`        | HSV range adjustment with live preview |
+| `HandDetectionViewer` | Safety zone visualization and editing  |
 
 ### `src/launch/`
 
@@ -826,7 +828,7 @@ Main launch configuration for the complete system.
 - Klotski Webpage. 2swap, https://2swap.github.io/Klotski-Webpage/data.json
 
 ### Acknowledgements
-We would like to thank our tutor, David Nie, for his careful guidance and dedicated support throughout our project. David provided us with many valuable suggestions that greatly improved our work. 
+We would like to thank our tutor, David Nie, for his careful guidance and dedicated support throughout our project. David provided us with many valuable suggestions that greatly improved our work.
 
 We would also like to thank our course convenor, Will Midgley, for providing the project topic and for his support during the course.
 
