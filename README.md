@@ -140,7 +140,7 @@ Monitors the camera feed for human hands using [MediaPipe Hands detection](https
 A C++ ROS2 service node that finds the optimal move sequence to solve the Klotski puzzle. Given the current board state and a goal configuration via the `SolveBoard` service, it returns the shortest `MoveList` using **BFS** over the state-space graph. The solver represents the 4×5 board as a grid with four piece types (1×1, 1×2, 2×1, 2×2) and explores valid sliding moves. [Precomputed graph data](https://2swap.github.io/Klotski-Webpage/data.json) enumerating all 65,880 reachable configurations accelerates pathfinding.
 
 #### Arm Manipulation Node
-MoveIt is been used for control UR5e robot to approach, retreat, pick and place blocks on the Klotski Board. This node subscribes to the sense node to get the real time board coordinates and received the command from plan node with the target piece and cell.   
+MoveIt is been used for control UR5e robot to approach, retreat, pick and place blocks on the Klotski Board. This node subscribes to the sense node to get the real-time board coordinates and received the command from plan node with the target piece and cell.   
 
 #### Gripper Manipulation Node
 
@@ -483,7 +483,7 @@ The system demonstrated successful integration of all software components. The c
 - Summarise what makes your approach novel, creative, or particularly effective.
 
 ### Major Challenge for Arm Manipulator
-The path planning in MoveIt often failed and took a long time to compute. To improve robustness, we decided to use joint-space planning with joint constraints as our main strategy, and only use Cartesian planning for short local motions.
+The path planning in MoveIt often failed and took a long time to compute. To improve robustness, we decided to use joint-space planning with joint constraints as our main strategy, and only use Cartesian planning for short distance movements.
 
 To get the real-time visualisation of the board coordinates for arm manipulator is also a challenge. Once the detected board pose has an offset, the target pose of the end-effector will be shifted as well, which can cause the whole process to fail. To solve this, we introduced an ArUco offset to correct the marker pose in the base_link frame, so that the estimated board coordinates remain accurate.
 
