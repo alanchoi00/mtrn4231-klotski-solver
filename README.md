@@ -797,6 +797,12 @@ We would like to thank our tutor, David Nie, for his careful guidance and dedica
 
 We would also like to thank our course convenor, Will Midgely, for providing the project topic and for his support during the course.
 
+## Drawings
+![acrylic drawing](Drawings/acyrlic_parts.png)
+![printed parts](Drawings/printed_parts.png)
+![misc](Drawings/misc.png)
+![exploed](Drawings/explode.png)
+![assembly](Drawings/assem_drawing.png)
 
 ## 📄 License
 
