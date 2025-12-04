@@ -491,6 +491,17 @@ python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode compute
 
 See `docs/CAMERA_CALIBRATION.md` for detailed instructions.
 
+## Reference
+- Ros2 webserverce
+- Ros2 Bridage
+- mediapipe
+- pyrealsense2
+- cv_bridge
+
+## Acknowledge
+Thank to David Nie for supporting 
+Thanks to Will Midgley 
+
 ## 📄 License
 
 This project is developed for MTRN4231 coursework at UNSW.
