@@ -412,8 +412,26 @@ The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection V
 ![Hand Safety Zone Calibration](images/hand_safety_zone_calibration_demo.gif)
 
 ### Hardware Setup
+**Teensy Wiring**
+- connect teensy to PC via usb cable (this will also provide power)
+- connect PWM pin of teensy to servo, via long robot line cable.
+- connect teensy ground pin robot line ground pin.
 
-TODO
+**gripper Setup**
+- Ensure servo is in its zero position and the is gripper in its closed configuration during assembly.
+- interface gripper mount to robot receptacle.
+- connect servo ground, power and signal pins to ground, 5 votls and the teensy PWM line respectively.
+
+Feel free to tes the servos movement with the follwing bash commands
+```bash
+#set up - run once
+stty -F /dev/ttyACM0 9600 cs8 clocal igncr
+
+# set angle signal - run when you wish to change servo angle
+echo "[integer string 180 - 0]" > /dev/ttyACM0
+```
+
+For more information regarding wiring, refer to the wiring diagram in the end effector overview.
 
 ## ⚙️ Running the System
 
