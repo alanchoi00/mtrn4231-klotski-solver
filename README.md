@@ -176,6 +176,8 @@ MoveIt is been used for control UR5e robot to approach, retreat, pick and place 
 
 #### Gripper Manipulation Node
 
+This node is tasked with sending serial messages to the teensy board via USB. It is an action server which subscribes to the "grip_peice" action. Depending on the action it recived, it will request the gripper to open or close. The angle values of the grippers open and closed states are hard coded into the gripper manipulation node. The node does not read any feedback from the teensy, but is capable of doing so and returning those values in the future.
+
 ### Custom ROS2 Interfaces
 
 The system defines several custom ROS2 messages, services, and actions to facilitate communication between nodes.
