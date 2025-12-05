@@ -1,61 +1,335 @@
 # MTRN4231 Klotski Solver
 
-A ROS2-based robotic system for solving the Klotski sliding puzzle using computer vision, path planning, and robotic manipulation.
+A ROS2-based robotic system for solving the Klotski sliding puzzle using computer vision, path planning, and robotic manipulation with a UR5e robot arm.
+
+- [MTRN4231 Klotski Solver](#mtrn4231-klotski-solver)
+  - [📋 Overview](#-overview)
+  - [🏗️ System Architecture](#️-system-architecture)
+    - [RQT Node Graph](#rqt-node-graph)
+    - [Package-Level Interaction](#package-level-interaction)
+    - [TF Tree](#tf-tree)
+    - [Behaviour Tree](#behaviour-tree)
+      - [Brain Node](#brain-node)
+      - [Sense Node](#sense-node)
+      - [Hand Safety Node](#hand-safety-node)
+      - [Plan Node](#plan-node)
+      - [Arm Manipulation Node](#arm-manipulation-node)
+      - [Gripper Manipulation Node](#gripper-manipulation-node)
+    - [Custom ROS2 Interfaces](#custom-ros2-interfaces)
+  - [🔧 Technical Components](#-technical-components)
+    - [Computer Vision](#computer-vision)
+    - [Custom End Effector](#custom-end-effector)
+      - [Assembly](#assembly)
+      - [Control](#control)
+      - [Wiring Digram](#wiring-digram)
+    - [System Visualisation](#system-visualisation)
+    - [Closed-Loop Operation](#closed-loop-operation)
+  - [🚀 Installation and Setup](#-installation-and-setup)
+    - [Prerequisites](#prerequisites)
+      - [System Requirements](#system-requirements)
+      - [Required ROS2 Packages](#required-ros2-packages)
+      - [Python Dependencies](#python-dependencies)
+    - [1. Clone and Build ROS Workspace](#1-clone-and-build-ros-workspace)
+    - [2. Install Dashboard Dependencies](#2-install-dashboard-dependencies)
+    - [3. Configuration](#3-configuration)
+      - [Environment Variables](#environment-variables)
+    - [4. Camera Calibration](#4-camera-calibration)
+      - [HSV Color Calibration](#hsv-color-calibration)
+      - [Hand Safety Zone Calibration](#hand-safety-zone-calibration)
+    - [Hardware Setup](#hardware-setup)
+  - [⚙️ Running the System](#️-running-the-system)
+  - [🔧 Development](#-development)
+    - [Building Individual Packages](#building-individual-packages)
+    - [ROS2 Commands](#ros2-commands)
+  - [📈 Results and Demonstration](#-results-and-demonstration)
+    - [Working Components](#working-components)
+    - [Known Issues](#known-issues)
+      - [ArUco TF Frame Inaccuracy](#aruco-tf-frame-inaccuracy)
+      - [Path Planning Failures](#path-planning-failures)
+    - [Quantitative Performance](#quantitative-performance)
+    - [Demonstration Outcome](#demonstration-outcome)
+  - [💬 Discussion and Future Work](#-discussion-and-future-work)
+    - [Engineering Challenges and How They Were Addressed](#engineering-challenges-and-how-they-were-addressed)
+    - [Future Work](#future-work)
+    - [Novel and Effective Aspects of Our Approach](#novel-and-effective-aspects-of-our-approach)
+  - [👥 Contributors and Roles](#-contributors-and-roles)
+  - [📁 Repository Structure](#-repository-structure)
+    - [`klotski_utils/`](#klotski_utils)
+    - [`pkg_brain/`](#pkg_brain)
+    - [`pkg_sense/`](#pkg_sense)
+    - [`pkg_plan/`](#pkg_plan)
+    - [`pkg_manipulation/`](#pkg_manipulation)
+    - [`gripper_description/`](#gripper_description)
+    - [`ur_with_gripper_description/`](#ur_with_gripper_description)
+    - [`dashboard_app/`](#dashboard_app)
+    - [`src/launch/`](#srclaunch)
+  - [🗿 References and Acknowledgements](#-references-and-acknowledgements)
+    - [References](#references)
+    - [Acknowledgements](#acknowledgements)
+  - [Drawings](#drawings)
+  - [📄 License](#-license)
+
 
 ## 📋 Overview
 
-This project implements an automated Klotski puzzle solver that:
+![Klotski Solver Demo](images/klotski_solver_demo.gif)
 
-- **Senses**: Uses computer vision to detect the current puzzle state
-- **Plans**: Generates optimal move sequences to reach the goal configuration
-- **Acts**: Controls a robotic arm to physically manipulate puzzle pieces
-- **Monitors**: Provides a web-based dashboard for real-time control and visualization
+This project delivers an interactive robotic system designed to support young learners in developing spatial reasoning and problem-solving skills through the classic Klotski sliding-block puzzle. The puzzle consists of blocks of various sizes (1×1, 1×2, 2×1, 2×2) arranged on a confined 4×5 board. The system is designed with children in mind and could be adopted by parents, schools and educational programs looking to enhance hands-on learning. The robot can transform any starting configuration into a chosen target pattern, reinforcing pattern recognition, logical reasoning and strategic planning.
 
-## 🚀 Quick Start
+To make the activity engaging and educational, the robot demonstrates clear reasoning, safe physical manipulation, and transparent decision-making. The system:
+
+- **Senses**: Uses computer vision to detect the current puzzle state and board position via ArUco markers
+- **Plans**: Generates optimal move sequences using BFS-based path planning to reach the goal configuration
+- **Acts**: Executes moves using a UR5e robotic arm equipped with a custom end effector designed for safe, reliable interaction around children
+- **Monitors**: Provides a web-based dashboard for real-time control, visualization and safety monitoring
+
+The robot operates in a fully closed loop as it continuously observes the physical board, updates its internal state and validates each move as it is executed. Learners can request single-step hints or ask the robot to demonstrate complete solution paths, enabling either collaborative exploration or competitive play.
+
+## 🏗️ System Architecture
+
+### RQT Node Graph
+
+![RQT Node Graph](images/RQT_Node_Graph.png)
+> *Generated using `rqt_graph` showing active nodes and topic connections.* Filtered out internal ROS2 nodes for clarity.
+
+### Package-Level Interaction
+
+![Package Interaction Diagram](images/Package_Interaction_Diagram.svg)
+
+> *Interactive diagram generated with [draw.io](https://app.diagrams.net/).*
+
+### TF Tree
+
+The system publishes the following TF frames for coordinate transformations:
+
+```mermaid
+graph TD
+    A[base_link] --> B[camera_link]
+    B --> C[camera_color_optical_frame]
+    C --> D[aruco_marker_0]
+    C --> E[aruco_marker_1]
+    C --> F[aruco_marker_2]
+    C --> G[aruco_marker_3]
+    F --> H[klotski_board]
+```
+
+- **base_link**: Robot base frame (world origin)
+- **camera_link → camera_color_optical_frame**: Camera frames from RealSense driver
+- **aruco_marker_0–3**: Individual marker poses computed via `cv2.solvePnP`
+- **klotski_board**: Board frame derived from bottom-left marker (aruco_marker_2) with configured offset
+
+The arm manipulation node uses the `klotski_board` frame to compute piece world positions by applying cell-to-board offsets.
+
+### Behaviour Tree
+
+Below is a high-level flowchart of the system's operational loop:
+
+```mermaid
+flowchart TD
+    subgraph Safety["Safety Monitor (Parallel)"]
+        S1[Camera Feed] --> S2{Hand in Safety Zone?}
+        S2 -->|Yes| S3[Publish Stop Signal]
+        S3 --> S4[Pause Arm & Save Phase]
+        S2 -->|No for N frames| S5[Clear Stop Signal]
+        S5 --> S6[Resume from Retreat Phase]
+    end
+
+    subgraph Main["Main Execution Loop"]
+        A[Trigger Camera Capture] --> B[Process Image]
+        B -->|ArUco + HSV Detection| C[Sense Board State]
+        C --> D{Matches Expected State?}
+        D -->|No| E[Request Replan via BFS Solver]
+        D -->|Yes| F[Use Existing Plan]
+        E --> G[Get Next Move from Plan]
+        F --> G
+        G --> H[Approach Piece]
+        H --> I[Close Gripper]
+        I --> J[Pick & Place Piece]
+        J --> K[Open Gripper]
+        K --> L[Retreat to Home]
+        L --> M{More Moves?}
+        M -->|Yes| A
+        M -->|No| N[Goal Reached]
+    end
+
+    S4 -.->|Interrupts| H
+    S4 -.->|Interrupts| J
+    S6 -.->|Resumes| L
+```
+
+#### Brain Node
+The central orchestrator that coordinates all system operations through a modular manager architecture. It manages the complete sense-plan-act loop using a 5-phase manipulation sequence (Sense -> Plan -> Approach -> Grip Close -> Pick/Place -> Grip Open -> Retreat). The node handles UI commands for mode switching (auto/step/pause/reset), subscribes to board state updates from the sense node, integrates with the safety system to pause/resume operations when hands are detected, and delegates tasks to specialised managers (UIManager, ServiceManager, ActionExecutor, PipelineOrchestrator). The pipeline orchestrator implements a **Chain of Responsibility pattern** where handlers are processed sequentially, each deciding whether to handle the current state or pass to the next handler in the chain.
+
+#### Sense Node
+An action service that processes data from the overhead RealSense camera to detect ArUco markers, compute the board pose, warp the image to a top-down view and classify each cell using HSV colour masks. It reconstructs the full Klotski board layout and publishes a BoardState message and TF frame to assist with the closed-loop planning and manipulation.
+
+#### Hand Safety Node
+Monitors the camera feed for human hands using [MediaPipe Hands detection](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker). When hands are detected within a configurable polygon ROI (safety zone), it immediately publishes a stop signal on `/safety/stop`. The safety stop clears after a configurable number of consecutive frames without hands, allowing automatic resumption of operations. Provides services for dynamically adjusting the safety zone via the dashboard.
+
+![Hand Safety Demo](images/hand_safety_demo.gif)
+
+#### Plan Node
+A C++ ROS2 service node that finds the optimal move sequence to solve the Klotski puzzle. Given the current board state and a goal configuration via the `SolveBoard` service, it returns the shortest `MoveList` using **BFS** over the state-space graph. The solver represents the 4×5 board as a grid with four piece types (1×1, 1×2, 2×1, 2×2) and explores valid sliding moves. [Precomputed graph data](https://2swap.github.io/Klotski-Webpage/data.json) enumerating all 65,880 reachable configurations accelerates pathfinding.
+
+#### Arm Manipulation Node
+MoveIt is been used for control UR5e robot to approach, retreat, pick and place blocks on the Klotski Board. This node subscribes to the sense node to get the real-time board coordinates and received the command from plan node with the target piece and cell.
+
+#### Gripper Manipulation Node
+
+### Custom ROS2 Interfaces
+
+The system defines several custom ROS2 messages, services, and actions to facilitate communication between nodes.
+
+<details>
+<summary><strong>Messages</strong></summary>
+
+| Message              | Description                           |
+| -------------------- | ------------------------------------- |
+| `Board.msg`          | Board state with piece positions      |
+| `BoardSpec.msg`      | Board dimensions (4×5 grid)           |
+| `BoardState.msg`     | Complete board state with pose        |
+| `Cell.msg`           | Grid cell coordinates (col, row)      |
+| `Piece.msg`          | Piece definition (type, color, cells) |
+| `Move.msg`           | Single move (piece + target cell)     |
+| `MoveList.msg`       | Sequence of moves                     |
+| `HSVRange.msg`       | HSV color range for detection         |
+| `HSVRanges.msg`      | Multiple color ranges                 |
+| `GripperCommand.msg` | Gripper open/close commands           |
+| `UICommand.msg`      | Dashboard commands                    |
+
+</details>
+
+<details>
+<summary><strong>Services</strong></summary>
+
+| Service                   | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `SolveBoard.srv`          | Request optimal path from current to goal state |
+| `CaptureBoard.srv`        | Capture and return current board state          |
+| `GetHSVRanges.srv`        | Get current color detection ranges              |
+| `SetHSVRanges.srv`        | Update color detection ranges                   |
+| `ResetHSVRanges.srv`      | Reset to default HSV ranges                     |
+| `ExportHSVRangesYaml.srv` | Export HSV config to YAML                       |
+| `GetSafetyZone.srv`       | Get safety monitoring ROI                       |
+| `SetSafetyZone.srv`       | Set safety monitoring ROI                       |
+
+</details>
+
+<details>
+<summary><strong>Actions</strong></summary>
+
+| Action             | Description                           |
+| ------------------ | ------------------------------------- |
+| `MovePiece.action` | Execute 5-phase manipulation sequence |
+| `GripPiece.action` | Open/close gripper                    |
+
+</details>
+
+## 🔧 Technical Components
+
+### Computer Vision
+
+The vision pipeline consists of several stages that transform raw camera data into a complete and reliable board representation. The process begins with the detection of the four ArUco markers (DICT_4X4_50, 65 mm) mounted at the corners of the board. Each marker (ID 0 (top-left), 1 (top-right), 2 (bottom-left) and 3 (bottom-right)) is identified and its pixel and 3D pose are estimated.
+
+![Aruco Detections](images/debug_markers.png)
+
+Because the physical offsets between each marker and the true board corner are known from measurement, the system can accurately infer the precise location of each board corner in the camera frame. Using these corrected corner coordinates, the pipeline computes a homography that warps the perspective camera image into a rectified, top-down view of the board.
+
+![Warped Board](images/warped_board.png)
+
+This transformation removes perspective distortion and aligns the image with the board’s dimensions. In this normalised space, the board is divided into a 4×5 grid, indexed from the bottom-left corner as cell (0,0). This consistent coordinate system allows the robot, planner, and UI to refer to piece locations.
+
+Once the grid is established, each cell is classified through HSV-based colour detection. Tunable thresholds—adjustable through our dashboard masking tool—enable robust cell classification across varying lighting conditions. The result is a clean, colour-labelled grid representing the state of the board.
+
+![Cell Overlay](images/cells_overlay.png)
+
+Finally, the system reconstructs the puzzle configuration by grouping neighbouring cells of the same colour to infer the Klotski piece shapes. Since each valid colour pattern corresponds to a unique arrangement of pieces, this grouping yields a fully validated board state ready for closed-loop planning and manipulation.
+
+
+### Custom End Effector
+
+The custom end effector is a parallel gripper driven by a single servo motor. It consists primarily of laser-cut acrylic sheet and plywood.
+
+![Gripper assembly render](images/assembly_render.png)
+
+- **Control**: Teensy based control via PWM signal
+- **Actuation**: Single servo motor for parallel jaw movement, required decent level of torque
+- **Mounting**: Attaches to UR5e wrist via standard flange
+- **Features** 3D printed fingertips are notably removable and swappable. Sandpaper on the fingertips increases firction and grip consistency.
+- **Spring** An optinal spring can be placed beteen the finger links to remove any backlash and improve closing consistency.
+
+#### Assembly
+For Engineering drawings and assembly details please view the Drawings section at the bottom of this README.
+
+#### Control
+In our setup, this PWM signal is supplied by a Teensy board. To keep the Teensy near our main computer and connected via USB, its PWM output is sent to the end effector over a long cable.
+
+The Teensy simply monitors the serial connection for messages from the PC. It expects an integer value transmitted as a string. Upon receiving this string, the Teensy generates a PWM signal to move the servo by the corresponding angular amount. For example, sending the message "40" via serial will cause the gripper to open by 40 degrees.
+
+Note: To ensure accurate angular control, the servo must be given a zero-degree PWM signal while the gripper is being assembled in a fully closed configuration.
+
+#### Wiring Digram
+
+![Gripper assembly render](Drawings/servo_wire.png)
+
+### System Visualisation
+
+Our system provides two layers of visualisation. The custom User Interface to present the puzzle goal state to clearly understand the robot’s intended solution path and progress.
+
+![Dashboard UI](images/UI_visualisation.png)
+
+In parallel, RViz is used to display the custom end effector model with its live orientation in the world, the TF poses of all four ArUco markers and the computed board pose to verify camera calibration and to confirm correct alignment between the computer vision and robot's coordinate system:
+
+![RVIZ Visualisation](images/rviz.jpg)
+
+Together, these visual tools support both user clarity and technical validation of the system.
+
+### Closed-Loop Operation
+
+The system employs two closed-loop feedback mechanisms to ensure robust and safe execution. **Visual feedback** verifies manipulation accuracy—after each move phase, the brain node triggers a camera capture and compares the sensed board state against the **expected state** (derived by applying the intended move). If they match, execution proceeds; if not, the system automatically **replans** from the actual state to the goal, handling slippage, incomplete moves, or external interference. In parallel, a **safety feedback loop** continuously monitors for human hands via MediaPipe. When hands enter the configurable safety zone, an immediate stop signal pauses the arm and saves the current phase. Once hands clear for a set number of frames, the system resumes from a safe retreat position, allowing operators to intervene without disabling the robot.
+
+## 🚀 Installation and Setup
 
 ### Prerequisites
 
 #### System Requirements
 
-- **ROS2 Humble**
-- **Node.js 18+** and npm
-- **Python 3.8+**
-- **OpenCV** (for computer vision)
-- **Camera** (USB webcam or built-in)
-- **Robotic Arm** (UR5e)
-- **Klotski Puzzle Board and Pieces**
+- **[Ubuntu 22.04](https://releases.ubuntu.com/jammy/)**
+- **[ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)**
+- **[Node.js 18+](https://nodejs.org/en/download)** and npm
+- **[Python 3.10+](https://www.python.org/downloads/)**
+- **[OpenCV](https://opencv.org/)** with ArUco support
+- **[MoveIt2](https://moveit.picknik.ai/humble/doc/tutorials/getting_started/getting_started.html)**
 
 #### Required ROS2 Packages
 
-Install the following ROS2 packages:
-
 ```bash
-# Core ROS2 packages
-sudo apt install ros-humble-rclpy
-sudo apt install ros-humble-std-msgs
-sudo apt install ros-humble-sensor-msgs
-sudo apt install ros-humble-action-msgs
-sudo apt install ros-humble-builtin-interfaces
+# Core packages
+sudo apt install ros-humble-rclpy ros-humble-std-msgs ros-humble-sensor-msgs
 
 # TF2 for coordinate transforms
-sudo apt install ros-humble-tf2-ros
+sudo apt install ros-humble-tf2-ros ros-humble-tf2-geometry-msgs
 
 # ROS Bridge for web interface
-sudo apt install ros-humble-rosbridge-server
+sudo apt install ros-humble-rosbridge-server ros-humble-web-video-server
 
 # Camera support
-sudo apt install ros-humble-v4l2-camera
+sudo apt install ros-humble-realsense2-camera
 
-# UR5e Robot Driver and MoveIt Integration
-sudo apt install ros-humble-ur-robot-driver
-sudo apt install ros-humble-ur-moveit-config
+# UR5e Robot Driver and MoveIt
+sudo apt install ros-humble-ur-robot-driver ros-humble-ur-moveit-config
 
-# Launch system
-sudo apt install ros-humble-launch
-sudo apt install ros-humble-launch-ros
+# MoveIt2
+sudo apt install ros-humble-moveit
 
-# Build tools
-sudo apt install ros-humble-ament-cmake
+# CV Bridge
+sudo apt install ros-humble-cv-bridge
+```
+
+#### Python Dependencies
+
+```bash
+pip install opencv-python mediapipe pyserial pyrealsense2 scipy
 ```
 
 ### 1. Clone and Build ROS Workspace
@@ -69,105 +343,150 @@ source install/setup.bash
 ### 2. Install Dashboard Dependencies
 
 ```bash
-cd dashboard_app
+cd src/dashboard_app
 npm install
 ```
 
-### 3. Launch the System
+### 3. Configuration
 
-#### Terminal 1: ROS Backend
+The system uses YAML configuration files located in each package's `config/` directory. Key parameters can be adjusted without rebuilding:
+
+| Config File                                   | Description                                                                              |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pkg_brain/config/brain.config.yaml`          | Delay between moves, timing parameters                                                   |
+| `pkg_manipulation/config/arm.config.yaml`     | MoveIt planning parameters, velocity/acceleration limits, board geometry, height offsets |
+| `pkg_manipulation/config/gripper.config.yaml` | Serial port, baud rate, gripper timing                                                   |
+| `pkg_sense/config/sense.config.yaml`          | Board dimensions, ArUco marker IDs/sizes, frame IDs, piece color counts                  |
+| `pkg_sense/config/hand_safety.config.yaml`    | Detection confidence, safety zone ROI polygon, clear-after-frames threshold              |
+| `pkg_sense/config/hsv_ranges.default.yaml`    | HSV color ranges for piece detection (can be tuned via dashboard)                        |
+
+#### Environment Variables
+
+The launch scripts use the following defaults that can be overridden:
+
+| Variable   | Default         | Description                                            |
+| ---------- | --------------- | ------------------------------------------------------ |
+| `ROBOT_IP` | `192.168.0.100` | UR5e robot IP address                                  |
+| Camera TF  | See below       | Camera-to-base transform (hand-eye calibration result) |
+
+### 4. Camera Calibration
+
+The system requires a camera-to-robot base transform (hand-eye calibration). This can be provided in two ways:
+
+**Option 1: Command-line arguments** (recommended for quick adjustments)
+```bash
+# ./runKlotski.sh x y z qx qy qz qw
+./runKlotski.sh 1.31 0.02 0.67 -0.40 0.00 0.92 0.01
+```
+
+**Option 2: Use calibration script** to compute the transform from ArUco marker observations:
+```bash
+# Preview camera feed and marker detection
+python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode preview
+
+# Collect calibration samples (move robot to different poses)
+python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode collect --samples 20
+
+# Compute optimal transform
+python3 src/pkg_sense/scripts/calibrate_camera_tf.py --mode compute
+```
+
+See `docs/CAMERA_CALIBRATION.md` for detailed calibration instructions.
+
+#### HSV Color Calibration
+
+Piece color detection ranges can be calibrated via the dashboard's **Color Masker** tool:
+1. Navigate to the Color Masker tab in the dashboard
+2. Adjust HSV sliders while viewing the live camera feed
+3. Export calibrated ranges to `hsv_ranges.default.yaml`
+
+
+![HSV Color Calibration](images/hsv_color_calibration_demo.gif)
+
+
+#### Hand Safety Zone Calibration
+The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection Viewer**:
+1. Navigate to the Hand Detection Viewer tab
+2. Drag the polygon vertices to define the safety zone
+3. Changes are applied in real-time
+
+
+![Hand Safety Zone Calibration](images/hand_safety_zone_calibration_demo.gif)
+
+### Hardware Setup
+
+**UR5e Arm Setup**
+
+1. Power on the UR5e and ensure the teach pendant shows the robot in **Remote Control** mode.
+2. On the teach pendant, navigate to **Program Robot → Load Program** and load `ros2.urpd` (this external control program is pre-installed on all UNSW UR5e arms).
+3. On your PC, run the Klotski launch script (as described in the ["⚙️ Running the System"](#️-running-the-system) section below).
+4. Once the system is running, press **Play** on the teach pendant to start the external control program.
+5. Verify connectivity by performing a small test motion in RViz:
+   - In RViz, use the MoveIt MotionPlanning panel to plan and execute a minor joint movement.
+   - If execution fails, press **Stop** on the teach pendant, then **Play** again to restart the external control program, and retry the motion.
+
+**Teensy Wiring**
+- Connect Teensy to PC via USB cable (this also provides power).
+- Connect PWM pin of Teensy to servo via the long robot line cable.
+- Connect Teensy ground pin to robot line ground pin.
+
+**Gripper Setup**
+- Ensure servo is in its zero position and the gripper is in its closed configuration during assembly.
+- Interface gripper mount to robot receptacle.
+- Connect servo ground, power, and signal pins to ground, 5V, and the Teensy PWM line respectively.
+
+Feel free to test the servo's movement with the following bash commands:
+```bash
+# Setup - run once
+stty -F /dev/ttyACM0 9600 cs8 clocal igncr
+
+# Set angle signal - run when you wish to change servo angle
+echo "[integer 0-180]" > /dev/ttyACM0
+```
+
+For more information regarding wiring, refer to the wiring diagram in the end effector overview.
+
+## ⚙️ Running the System
+
+**For Real Robot:**
 
 ```bash
-# Launch core ROS nodes
-ros2 launch launch/klotski.launch.py
+# Default camera transform
+./runKlotski.sh
 
-# Or launch individually:
-ros2 run pkg_brain task_brain # Task orchestrator
-ros2 launch rosbridge_server # ROS bridge
+# With custom camera transform (x y z qx qy qz qw)
+./runKlotski.sh 1.31 0.02 0.67 -0.40 0.00 0.92 0.01
 ```
 
-#### Terminal 2: Camera (if using USB camera)
+**For Simulation:**
 
 ```bash
-# Start camera node
-./camera.sh
-# Or: ros2 run v4l2_camera v4l2_camera_node --ros-args -p video_device:="/dev/video0"
+./runKlotskiSim.sh
 ```
 
-#### Terminal 3: Dashboard
+3 new terminals will open:
+- **Terminal 1**: UR5e Driver Server
+- **Terminal 2**: Web dashboard development server
+- **Terminal 3**: Camera TF static publisher
 
-```bash
-cd dashboard_app
-npm run dev
-```
+At the terminal that ran the script, the full klotski system will launch after 5-10 seconds.
 
-The dashboard will be available at: <http://localhost:3000>
+> To access the dashboard, open <http://localhost:3000> in your browser.
 
-## 📦 Package Structure
+The system should be running with all nodes launched. Now you can ask the klotski system to solve the puzzle by:
+1. Set initial board state on the physical board
+2. Setting the goal board state via the dashboard's Goal Editor
+   ![Goal Editor](images/goal_editor_demo.gif)
+3. Clicking "Auto" or "Step" in the Control Panel
+4. Observing the robot manipulate the pieces to solve the puzzle
 
-### `klotski_interfaces/`
-
-Custom ROS2 message and service definitions:
-
-- **Messages**: `Board`, `BoardState`, `Piece`, `Cell`, `Move`, etc.
-- **Services**: `SolveBoard` for path planning requests
-- **Actions**: `MovePiece` for robotic manipulation
-
-### `pkg_brain/`
-
-**Task Orchestrator** - Coordinates the entire solving process:
-
-```python
-# Main responsibilities:
-- Subscribe: /ui/cmd, /board_state, /ui/goal
-- Publish: /ui/events
-- Services: /plan/solve
-- Actions: /move_piece
-```
-
-### `pkg_sense/`
-
-**Computer Vision Module** (To be implemented):
-
-- Camera calibration and image processing
-- Puzzle piece detection and tracking
-- Board state estimation
-- Publishes to `/board_state`
-
-### `pkg_plan/`
-
-**Path Planning Module** (To be implemented):
-
-- Klotski puzzle solving algorithms
-- Move sequence optimization
-- Collision avoidance
-- Serves `/plan/solve` requests
-
-### `pkg_manipulation/`
-
-**Robot Control Module** (To be implemented):
-
-- Robotic arm motion planning
-- Grasp planning and execution
-- Safety monitoring
-- Provides `/move_piece` action server
-
-### `dashboard_app/`
-
-**Web Interface** - Next.js application with:
-
-- Real-time ROS integration via rosbridge
-- Interactive puzzle editor
-- System monitoring and control
-- Built with React + TypeScript + Tailwind CSS
-
-## 🔧 Development Setup
+## 🔧 Development
 
 ### Building Individual Packages
 
 ```bash
 # Build specific packages
-colcon build --packages-select klotski_interfaces pkg_brain
+colcon build --packages-select pkg_brain pkg_sense
 
 # Build with debug info
 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
@@ -177,42 +496,478 @@ rm -rf build/ install/ log/
 colcon build
 ```
 
-### ROS2 Development Commands
+### ROS2 Commands
 
 ```bash
 # Check running nodes
 ros2 node list
 
 # Monitor topics
-ros2 topic list
-ros2 topic echo /ui/events
-ros2 topic hz /board_state
+ros2 topic echo /board_state
+ros2 topic hz /safety/stop
 
-# Service testing
-ros2 service list
-ros2 service call /plan/solve klotski_interfaces/srv/SolveBoard {}
+# Test services
+ros2 service call /plan/solve klotski_interfaces/srv/SolveBoard "{...}"
 
-# Action testing
-ros2 action list
-ros2 action send_goal /move_piece klotski_interfaces/action/MovePiece {}
+# Test actions
+ros2 action send_goal /arm_manipulation/move_piece klotski_interfaces/action/MovePiece "{...}"
 ```
 
-### Dashboard Development
+## 📈 Results and Demonstration
 
-```bash
-cd dashboard_app
+### Working Components
 
-# Development server with hot reload
-npm run dev
+During the demonstration, the following components performed successfully:
 
-# Production build
-npm run build
-npm run start
+- **Dashboard UI**: The web-based dashboard provided real-time control and visualisation. Mode switching (auto/step/pause/reset), goal state editing, and HSV color tuning all functioned correctly.
+- **Brain Node**: The central orchestrator successfully managed the sense-plan-act loop, handled UI commands, and coordinated the 5-phase manipulation sequence through the Chain of Responsibility pipeline.
+- **Plan Node**: The BFS-based solver correctly computed optimal move sequences from the current board state to the goal configuration.
+- **Sense Node (Color Detection)**: The adjustable HSV color masking via the dashboard allowed accurate detection of all piece colors. The board state was correctly reconstructed from the camera image, with the correct number and positions of pieces identified.
+- **Hand Safety Node**: MediaPipe hand detection and safety zone monitoring worked as expected, pausing operations when hands entered the ROI.
 
-# Linting
-npm run lint
+### Known Issues
+
+#### ArUco TF Frame Inaccuracy
+
+The sense node's published ArUco marker TF frames exhibited positional offsets from their true world positions. In the image below, the aruco frames can be seen misaligned with the physical markers on the board and the x-y plane of the `klotski_board` frame is not parallel with the board surface:
+
+![ArUco TF Frame Misalignment](images/rviz2.jpg)
+
+This is likely due to:
+
+1. **Camera intrinsic calibration drift**: The `cv2.solvePnP` function relies on accurate camera intrinsics (`fx`, `fy`, `ppx`, `ppy`, distortion coefficients). Small errors in these parameters—especially from factory defaults or environmental changes (temperature, focus)—propagate into the estimated marker pose.
+2. **Hand-eye calibration residual error**: The static transform from `camera_link` to `base_link` (hand-eye calibration) may contain residual errors that compound with marker pose estimation.
+3. **Marker size precision**: The configured marker length (65mm) must exactly match the physical markers; even 1-2mm discrepancy causes proportional depth errors in `solvePnP`.
+
+As a result, the `klotski_board` frame published by the sense node did not align precisely with the physical board, causing the arm to target incorrect world positions.
+
+#### Path Planning Failures
+
+The MoveIt2-based arm manipulation node experienced intermittent planning failures. Contributing factors include:
+
+1. **Constrained joint space**: The planner uses joint constraints (elbow, shoulder, wrist limits) to reduce the search space. While this speeds up planning for valid poses, it can cause failures when the target pose requires configurations outside these bounds.
+2. **Cartesian path threshold**: The planner requires >70% (`cartesian_fraction_threshold`) of the Cartesian path to be achievable. For certain cell positions—especially near board edges or when the arm is in awkward configurations—this threshold may not be met.
+3. **RRTConnect randomness**: The default `RRTConnectkConfigDefault` planner is probabilistically complete but not deterministic—repeated attempts with identical goals may yield different success rates.
+
+### Quantitative Performance
+
+Across testing, the system demonstrated strong quantitative performance. Piece detection accuracy exceeded 95% under varying lighting conditions, supported by adaptable HSV tuning and a stable homography derived from accurate marker detection. Performance decreased when the board was positioned further from the camera, where steeper viewing angles reduced colour separation and marker visibility. When using fixed coordinates, the robot executed each move in approximately 17 seconds on average, measured from the initial sensing stage to the completion of a pick-and-place action. Hand safety responsiveness remained consistently rapid, with the system pausing in under 0.2 seconds whenever a hand entered the region of interest. No false negatives were observed during testing, reinforcing the reliability of the safety system.
+
+### Demonstration Outcome
+
+The system demonstrated successful integration of all software components. The closed-loop sense-plan-act architecture was validated: the brain node correctly triggered camera captures, the plan node computed solutions, and the UI displayed real-time state. However, full autonomous puzzle solving was not achieved due to the ArUco TF frame offsets causing the arm to miss target piece positions.
+
+## 💬 Discussion and Future Work
+
+### Engineering Challenges and How They Were Addressed
+
+**Computer Vision Stability**
+
+Developing a fully closed-loop Klotski robot required overcoming several engineering challenges across computer vision, planning and manipulation. Achieving reliable computer vision was one of the most significant hurdles. Early testing showed that raw ArUco detections could fluctuate by several centimetres, leading to unstable board poses and unreliable planning. To address this, we combined the `cv2.solvePnP` and depth-based pose estimation with a multi-frame stability filter that rejects inconsistent readings and locks in a marker pose only when it converges within a tight threshold.
+
+**Colour-Based Piece Classification**
+
+Robust piece classification also posed difficulties due to colour variability, reflections, and shadows on the physical board. We addressed this by developing a carefully tuned HSV segmentation pipeline, producing clean masks and consistent grid-level classification across different lighting conditions.
+
+**Motion Planning Reliability**
+
+In the planning domain, MoveIt’s default Cartesian planner was often slow or prone to failure when generating full-board motions. To improve reliability, we shifted to joint-space planning with joint constraints as the primary strategy, reserving Cartesian motion for short, precise adjustments where straight-line movements were essential.
+
+**End Effector Design and Grasp Reliability**
+
+The end effector required several iterations to achieve reliable gripping across all piece types. We refined the gripper geometry, added sandpaper pads to increase friction, and introduced a spring mechanism to counteract backlash and improve grasp repeatability.
+
+### Future Work
+
+The follwing steps could be taken to improve the klotski solvers usability and function.
+
+**Auto Colour Masking**
+
+The colour masking process as it stands is manual and by necessity tedious. Auto colour masking would allow a customer to quickly get into the game without having to worry about different lighting conditions.
+
+It could run as follows:
+- Customer places klotski board in known calibration position at the program's direction.
+- A simple optimisation algorithm is run on the known configuration to find appropriate colour mask values.
+- Newly found colour mask values are saved and the customer is prompted to use the solver as normal.
+
+Alternatively, a YOLO-based object detection model could be trained on the Klotski pieces. This would eliminate the need for HSV tuning entirely and provide more robust detection under varying lighting conditions.
+
+**End Effector Feedback**
+
+In the case where a gripper attemps to pick up a block but fails, the current system will not realise this fact until after it has completed a movement sequence. A simple fix for this would be to incorporate immediate feedback from the gripper itself.
+
+Possible solutions:
+- Button on gripper fingertip which is pressed when an object is picked up.
+- Pressure sensor on fingertip which would work similary to the button.
+- Distance sensor (ultrasonic of TOF) to measure distance fom objects (a short, unchanging distance would correlate to a picked up object).
+
+All of these solutions could easily be interfaced through the teensy board. The feedback from the teensy could then easily be sent to ROS through the gripper action server.
+
+**Piece-Level TF Frames**
+
+Currently, the sense node publishes a single `klotski_board` TF frame, and the arm manipulation node computes piece positions by applying cell offsets to this board origin. A more robust architecture would have the sense node publish individual TF frames for each piece (e.g., `piece_red_2x2`, `piece_blue_0`, etc.).
+
+This change would provide several benefits:
+
+1. **Single Responsibility Principle (SRP)**: The sense node becomes solely responsible for all perception—both board detection and piece localisation. The arm node simply looks up the target piece frame without needing to know about grid geometry or cell sizes.
+
+2. **Misplacement Detection**: If a piece is accidentally knocked or misplaced between moves, the sense node would detect its actual position and publish the updated TF frame. The arm could then target the piece's true location rather than its expected grid cell.
+
+3. **Simplified Arm Logic**: The manipulation node would request the TF transform from `base_link` to `piece_X` directly, eliminating coordinate calculations and reducing coupling between nodes.
+
+4. **Enhanced RViz Visualisation**: With individual piece TF frames, RViz can display the board and all pieces as separate coordinate axes, making it trivial to verify piece detection accuracy and debug positioning issues in real time.
+
+The updated TF tree would look like:
+
+```mermaid
+graph TD
+    A[base_link] --> B[camera_link]
+    B --> C[camera_color_optical_frame]
+    C --> D[klotski_board]
+    D --> E[piece_red_2x2]
+    D --> F[piece_green_1x2]
+    D --> G[piece_blue_0]
+    D --> H[piece_blue_1]
+    D --> I[...]
 ```
+
+### Novel and Effective Aspects of Our Approach
+
+Several design decisions distinguish this project from a straightforward pick-and-place implementation:
+
+1. **Precomputed Solution Graph**: Rather than solving the puzzle at runtime with BFS, we leveraged a [precomputed dataset of all 65,880 reachable Klotski configurations](https://2swap.github.io/Klotski-Webpage/data.json). This guarantees optimal solutions in constant lookup time and eliminates the risk of planning timeouts during operation.
+
+2. **Chain of Responsibility Architecture**: The Brain node implements a `PipelineOrchestrator` using the Chain of Responsibility pattern, allowing each handler (capture, plan, move, verify) to be developed, tested, and extended independently. This modular design made iterative debugging far more manageable than a monolithic state machine.
+
+3. **Closed-Loop Verification with Safety Feedback**: The system re-captures the board after every move to verify success before proceeding. Additionally, the MediaPipe-based hand safety monitor can pause execution mid-pipeline if a human hand enters the workspace, providing a true sense-plan-act-verify loop with safety integration.
+
+4. **Integrated Web Dashboard**: The Next.js dashboard consolidates system control, visualisation, and calibration into a single interface. Operators can adjust HSV colour thresholds in real time, edit goal states graphically, configure safety zones, and switch execution modes—all without touching code or restarting nodes. This dramatically accelerates debugging and makes the system accessible to non-technical users.
+
+## 👥 Contributors and Roles
+
+- @alanchoi00 - Project Lead, System Architecture, Brain Node, UI Dashboard, Plan Node, Hand Safety Node
+- @slammyh - Sense Node, Klotski board design
+- @z5324144 - Arm Manipulation Node
+- @Ram0Gan35h - Gripper Manipulation Node, End Effector Design
+
+## 📁 Repository Structure
+
+Below is an overview of the repository structure:
+
+```txt
+mtrn4231-klotski-solver
+├── camera.sh (for launching realsense camera with correct parameters)
+├── docs
+│   └── ... (documentation files)
+├── Images
+│   └── ... (README images)
+├── README.md
+├── runKlotski.sh (for running full klotski system on real robot)
+├── runKlotskiSim.sh (for running full klotski system in simulation)
+├── setupFakeur5e.sh (for setting up UR5e simulation)
+├── setupRealur5e.sh (for setting up real UR5e)
+└── src
+    ├── dashboard_app
+    │   └── ...(Next.js dashboard application)
+    ├── gripper_description
+    │   └── ... (custom gripper URDF)
+    ├── klotski_interfaces
+    │   ├── action
+    │   │   └── ... (custom action definitions)
+    │   ├── msg
+    │   │   └── ... (custom message definitions)
+    │   └── srv
+    │       └── ... (custom service definitions)
+    ├── klotski_utils
+    │   └── ...  (shared utilities - especially for parameter handling)
+    ├── launch
+    │   └── klotski.launch.py (main launch file for entire system)
+    ├── pkg_brain
+    │   ├── config
+    │   │   └── brain.config.yaml (configurable parameters)
+    │   ├── launch
+    │   │   └── brain.launch.py (launch file for brain node)
+    │   ├── pkg_brain
+    │   │   ├── context.py (context management)
+    │   │   ├── handlers
+    │   │   │   └── ... (event handlers - following chain of responsibility pattern)
+    │   │   ├── managers
+    │   │   │   └── ... (various manager files, splitting responsibilities between UI, manipulation, planning, sensing)
+    │   │   ├── task_brain.py (main brain node implementation)
+    │   │   └── ui_modes.py (UI mode definitions)
+    │   ├── config
+    │   │   ├── arm.config.yaml (configuration for arm manipulator)
+    │   │   └── gripper.config.yaml (configuration for gripper manipulator)
+    │   ├── launch
+    │   │   └── manipulation.launch.py (launch file for manipulation nodes)
+    ├── pkg_manipulation
+    │   ├── arm
+    │   │   └── ... (C++ MoveIt-based UR5e arm manipulator)
+    │   └── gripper
+    │       └── ... (Python-based serial gripper manipulator)
+    ├── pkg_plan
+    │   └── ... (C++ path planning node with launch file and precomputed data)
+    ├── pkg_sense
+    │   ├── config
+    │   │   ├── hand_safety.config.yaml (hand safety node config)
+    │   │   ├── hsv_ranges.default.yaml (default HSV ranges for colour detection)
+    │   │   └── sense.config.yaml (sense node config)
+    │   ├── launch
+    │   │   └── sense.launch.py (launch file for sense node)
+    │   ├── pkg_sense
+    │   │   ├── constants.py (constants used across the package)
+    │   │   ├── exceptions.py (custom exceptions)
+    │   │   ├── hand_safety_node.py (hand safety node implementation)
+    │   │   ├── handlers
+    │   │   │   └── ... (handlers for service requests)
+    │   │   ├── managers
+    │   │   │   └── ... (various manager files, splitting responsibilities between camera, board detection, color detection, transforms)
+    │   │   ├── scripts
+    │   │   │   └── ... (utility scripts e.g., mock camera, calibration)
+    │   │   ├── sense_node.py (main sense node implementation)
+    │   │   ├── services
+    │   │   │   └── ... (FP service implementations)
+    │   │   └── types.py (custom types used in the package)
+    │   ├── scripts
+    │   │   └── calibrate_camera_tf.py (script for calibrating camera transform)
+    │   └── test_images (test images for mock camera)
+    └── ur_with_gripper_description
+        └── ... (UR5e with gripper URDF)
+```
+
+> Tree generated with `tree -L 4 -I 'build|install|log|node_modules'`
+
+<details>
+
+<summary><strong>Further details on repository structure - package level</strong> (click to expand)</summary>
+
+<br/>
+
+### `klotski_utils/`
+
+Shared Python utilities across packages.
+
+- `params.py` - Type-safe ROS2 parameter declaration helper (`declare_param[T]()`)
+
+### `pkg_brain/`
+
+**Task Orchestrator** - Central coordination node managing the complete solving pipeline.
+
+**Node:** `task_brain`
+
+**Responsibilities:**
+
+- UI mode management (auto/step/pause/reset)
+- Pipeline orchestration through handler chain
+- 5-phase manipulation execution (IDLE -> APPROACH -> PICK_PLACE -> RETREAT)
+- Safety stop integration
+
+**Subscriptions:**
+
+| Topic          | Type         | Description                |
+| -------------- | ------------ | -------------------------- |
+| `/board_state` | `BoardState` | Current sensed board state |
+| `/ui/cmd`      | `UICommand`  | Dashboard commands         |
+| `/ui/goal`     | `BoardState` | User-defined goal state    |
+| `/safety/stop` | `Bool`       | Emergency stop signal      |
+
+**Publications:**
+
+| Topic        | Type     | Description                  |
+| ------------ | -------- | ---------------------------- |
+| `/ui/events` | `String` | Status updates for dashboard |
+
+**Service Clients:**
+
+| Service       | Type         | Description           |
+| ------------- | ------------ | --------------------- |
+| `/plan/solve` | `SolveBoard` | Request path planning |
+
+**Action Clients:**
+
+| Action                             | Type        | Description      |
+| ---------------------------------- | ----------- | ---------------- |
+| `/arm_manipulation/move_piece`     | `MovePiece` | Arm manipulation |
+| `/gripper_manipulation/grip_piece` | `GripPiece` | Gripper control  |
+
+### `pkg_sense/`
+
+**Computer Vision Module** - Board state detection via camera and ArUco markers.
+
+**Nodes:**
+
+| Node                  | Description                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| `sense`               | Main sensing node - ArUco detection, board isolation, color detection |
+| `hand_safety_monitor` | Hand detection for safety stopping using MediaPipe                    |
+
+**Vision Pipeline:**
+
+1. **ArUco Detection** - Detect 4 corner markers (IDs 0-3, DICT_4X4_50, 65mm)
+2. **Board Isolation** - Homography transform for top-down rectified view
+3. **Color Detection** - HSV masking for piece identification per grid cell
+4. **Board Reconstruction** - Merge same-colour cells into corresponding pieces
+
+**Subscriptions:**
+
+| Topic                              | Type         | Description       |
+| ---------------------------------- | ------------ | ----------------- |
+| `/camera/camera/color/image_raw`   | `Image`      | Camera feed       |
+| `/camera/camera/color/camera_info` | `CameraInfo` | Camera intrinsics |
+
+**Publications:**
+
+| Topic                          | Type         | Description                    |
+| ------------------------------ | ------------ | ------------------------------ |
+| `/board_state`                 | `BoardState` | Detected board state with pose |
+| `/safety/stop`                 | `Bool`       | Hand detection safety signal   |
+| `/safety/hand_detection_image` | `Image`      | Annotated hand detection feed  |
+
+**TF Broadcasts:**
+
+| Frame     | Parent                       | Description                       |
+| --------- | ---------------------------- | --------------------------------- |
+| `aruco_X` | `camera_color_optical_frame` | Individual marker poses           |
+| `board`   | `base_link`                  | Board origin (bottom-left corner) |
+
+**Services:**
+
+| Service                 | Type            | Description           |
+| ----------------------- | --------------- | --------------------- |
+| `/sense/capture_board`  | `CaptureBoard`  | Capture current state |
+| `/sense/get_hsv_ranges` | `GetHSVRanges`  | Get color ranges      |
+| `/sense/set_hsv_ranges` | `SetHSVRanges`  | Set color ranges      |
+| `/safety/get_zone`      | `GetSafetyZone` | Get safety ROI        |
+| `/safety/set_zone`      | `SetSafetyZone` | Set safety ROI        |
+
+### `pkg_plan/`
+
+**Path Planning Module** - BFS-based Klotski solver with precomputed move database.
+
+**Node:** `solve_service_node` (C++)
+
+**Algorithm:**
+
+- Uses precomputed adjacency graph (`possible_combinations.json`) of all valid Klotski states
+- BFS search from current state to goal state
+- Returns optimal move sequence
+
+**Services:**
+
+| Service       | Type         | Description          |
+| ------------- | ------------ | -------------------- |
+| `/plan/solve` | `SolveBoard` | Compute optimal path |
+
+### `pkg_manipulation/`
+
+**Robot Control Module** - UR5e arm and gripper control using MoveIt2.
+
+**Nodes:**
+
+| Node                  | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `arm_manipulator`     | MoveIt-based arm motion planning and execution (C++) |
+| `gripper_manipulator` | Arduino-controlled servo gripper via serial (Python) |
+
+**Arm Manipulator Features:**
+
+- Cartesian path planning for predictable linear motions
+- Dynamic board pose subscription for accurate targeting
+- Collision objects (table, walls, ceiling)
+- Safety stop integration with immediate motion halt
+- Configurable velocity/acceleration scaling
+
+**Action Servers:**
+
+| Action                             | Type        | Description          |
+| ---------------------------------- | ----------- | -------------------- |
+| `/arm_manipulation/move_piece`     | `MovePiece` | 5-phase manipulation |
+| `/gripper_manipulation/grip_piece` | `GripPiece` | Gripper control      |
+
+**5-Phase Manipulation Sequence:**
+
+1. **IDLE** - Ready state
+2. **APPROACH** - Move above piece center
+3. **PICK** - Descend to grip height, close gripper
+4. **PLACE** - Move to target, open gripper
+5. **RETREAT** - Rise to safe height
+
+### `gripper_description/`
+
+URDF description for the custom gripper end effector.
+
+### `ur_with_gripper_description/`
+
+Combined URDF for UR5e robot with custom gripper attached.
+
+### `dashboard_app/`
+
+**Web Interface** - Next.js application for real-time control and visualization.
+
+**Technology Stack:**
+
+- Next.js 14 + React 18
+- TypeScript
+- Tailwind CSS + shadcn/ui components
+- roslib.js for ROS2 WebSocket communication
+
+**Features:**
+
+- Real-time board state visualization
+- Interactive goal state editor
+- Mode control (auto/step/pause/reset)
+- HSV color range tuning
+- Camera feed with safety zone overlay
+- Hand detection monitor with ROI editing
+
+**Key Components:**
+
+| Component             | Description                            |
+| --------------------- | -------------------------------------- |
+| `ControlPanel`        | Mode buttons and system control        |
+| `GoalEditor`          | Interactive goal state configuration   |
+| `ColourMasker`        | HSV range adjustment with live preview |
+| `HandDetectionViewer` | Safety zone visualization and editing  |
+
+### `src/launch/`
+
+Main launch configuration for the complete system.
+
+**`klotski.launch.py`** - Launches all nodes:
+
+- rosbridge_server (WebSocket)
+- web_video_server (camera streaming)
+- ur_moveit (robot driver + MoveIt)
+- pkg_manipulation (arm + gripper)
+- pkg_plan (solver)
+- pkg_sense (vision + safety)
+- pkg_brain (orchestrator)
+
+</details>
+
+## 🗿 References and Acknowledgements
+
+### References
+
+- Ros2 Web Bridge. Robot Web Tools, https://github.com/RobotWebTools/ros2-web-bridge
+- Ros2 Bridge. Robot Web Tools, https://github.com/RobotWebTools/rosbridge_suite
+- MediaPipe Hand Landmarker. Google, https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker
+- Librealsense(pyrealsense2). Intel RealSense, https://github.com/realsenseai/librealsense
+- Vision Opencv (Cv Bridge). ROS Perception, https://github.com/ros-perception/vision_opencv
+- Klotski Webpage. 2swap, https://2swap.github.io/Klotski-Webpage/data.json
+
+### Acknowledgements
+We would like to thank our tutor, David Nie, for his careful guidance and dedicated support throughout our project. David provided us with many valuable suggestions that greatly improved our work.
+
+We would also like to thank our course convenor, Will Midgley, for providing the project topic and for his support during the course.
+
+## Drawings
+![acrylic drawing](Drawings/acrylic_parts.png)
+![printed parts](Drawings/printed_parts.png)
+![misc](Drawings/misc.png)
+![exploed](Drawings/explode.png)
+![assembly](Drawings/assem_drawing.png)
 
 ## 📄 License
 
-This project is developed for MTRN4231 coursework.
+This project is developed for MTRN4231 coursework at UNSW. Please don't steal our work :)
