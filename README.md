@@ -48,6 +48,7 @@
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
     - [Engineering Challenges and How They Were Addressed](#engineering-challenges-and-how-they-were-addressed)
     - [Future Work](#future-work)
+    - [Novel and Effective Aspects of Our Approach](#novel-and-effective-aspects-of-our-approach)
   - [👥 Contributors and Roles](#-contributors-and-roles)
   - [📁 Repository Structure](#-repository-structure)
     - [`klotski_utils/`](#klotski_utils)
@@ -613,6 +614,18 @@ graph TD
     D --> H[piece_blue_1]
     D --> I[...]
 ```
+
+### Novel and Effective Aspects of Our Approach
+
+Several design decisions distinguish this project from a straightforward pick-and-place implementation:
+
+1. **Precomputed Solution Graph**: Rather than solving the puzzle at runtime with BFS, we leveraged a [precomputed dataset of all 65,880 reachable Klotski configurations](https://2swap.github.io/Klotski-Webpage/data.json). This guarantees optimal solutions in constant lookup time and eliminates the risk of planning timeouts during operation.
+
+2. **Chain of Responsibility Architecture**: The Brain node implements a `PipelineOrchestrator` using the Chain of Responsibility pattern, allowing each handler (capture, plan, move, verify) to be developed, tested, and extended independently. This modular design made iterative debugging far more manageable than a monolithic state machine.
+
+3. **Closed-Loop Verification with Safety Feedback**: The system re-captures the board after every move to verify success before proceeding. Additionally, the MediaPipe-based hand safety monitor can pause execution mid-pipeline if a human hand enters the workspace, providing a true sense-plan-act-verify loop with safety integration.
+
+4. **Integrated Web Dashboard**: The Next.js dashboard consolidates system control, visualisation, and calibration into a single interface. Operators can adjust HSV colour thresholds in real time, edit goal states graphically, configure safety zones, and switch execution modes—all without touching code or restarting nodes. This dramatically accelerates debugging and makes the system accessible to non-technical users.
 
 ## 👥 Contributors and Roles
 
