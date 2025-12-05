@@ -1,12 +1,11 @@
 # MTRN4231 Klotski Solver
 
-![Klotski Solver Demo](images/klotski_solver_demo.gif)
-
 - [MTRN4231 Klotski Solver](#mtrn4231-klotski-solver)
   - [📋 Overview](#-overview)
   - [🏗️ System Architecture](#️-system-architecture)
     - [RQT Node Graph](#rqt-node-graph)
     - [Package-Level Interaction](#package-level-interaction)
+    - [TF Tree](#tf-tree)
     - [Behaviour Tree](#behaviour-tree)
       - [Brain Node](#brain-node)
       - [Sense Node](#sense-node)
@@ -48,6 +47,7 @@
     - [Demonstration Outcome](#demonstration-outcome)
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
     - [Engineering Challenges and How They Were Addressed](#engineering-challenges-and-how-they-were-addressed)
+    - [Future Work](#future-work)
   - [👥 Contributors and Roles](#-contributors-and-roles)
   - [📁 Repository Structure](#-repository-structure)
     - [`klotski_utils/`](#klotski_utils)
@@ -69,6 +69,8 @@
 A ROS2-based robotic system for solving the Klotski sliding puzzle using computer vision, path planning, and robotic manipulation with a UR5e robot arm.
 
 ## 📋 Overview
+
+![Klotski Solver Demo](images/klotski_solver_demo.gif)
 
 This project delivers an interactive robotic system designed to support young learners in developing spatial reasoning and problem-solving skills through the classic Klotski sliding-block puzzle. The puzzle consists of blocks of various sizes (1×1, 1×2, 2×1, 2×2) arranged on a confined 4×5 board. The system is designed with children in mind and could be adopted by parents, schools and educational programs looking to enhance hands-on learning. The robot can transform any starting configuration into a chosen target pattern, reinforcing pattern recognition, logical reasoning and strategic planning.
 
@@ -93,6 +95,28 @@ The robot operates in a fully closed loop as it continuously observes the physic
 ![Package Interaction Diagram](images/Package_Interaction_Diagram.svg)
 
 > *Interactive diagram generated with [draw.io](https://app.diagrams.net/).*
+
+### TF Tree
+
+The system publishes the following TF frames for coordinate transformations:
+
+```mermaid
+graph TD
+    A[base_link] --> B[camera_link]
+    B --> C[camera_color_optical_frame]
+    C --> D[aruco_marker_0]
+    C --> E[aruco_marker_1]
+    C --> F[aruco_marker_2]
+    C --> G[aruco_marker_3]
+    F --> H[klotski_board]
+```
+
+- **base_link**: Robot base frame (world origin)
+- **camera_link → camera_color_optical_frame**: Camera frames from RealSense driver
+- **aruco_marker_0–3**: Individual marker poses computed via `cv2.solvePnP`
+- **klotski_board**: Board frame derived from bottom-left marker (aruco_marker_2) with configured offset
+
+The arm manipulation node uses the `klotski_board` frame to compute piece world positions by applying cell-to-board offsets.
 
 ### Behaviour Tree
 
@@ -203,11 +227,11 @@ The system defines several custom ROS2 messages, services, and actions to facili
 
 ### Computer Vision
 
-The vision pipeline consists of several stages that transform raw camera data into a complete and reliable board representation. The process begins with the detection of the four ArUco markers (DICT_4X4_50, 65 mm) mounted at the corners of the board. Each marker (ID 0 (top-left), 1 (top-right), 2 (bottom-left) and 3 (bottom-right)) is identified and its pixel and 3D pose are estimated. 
+The vision pipeline consists of several stages that transform raw camera data into a complete and reliable board representation. The process begins with the detection of the four ArUco markers (DICT_4X4_50, 65 mm) mounted at the corners of the board. Each marker (ID 0 (top-left), 1 (top-right), 2 (bottom-left) and 3 (bottom-right)) is identified and its pixel and 3D pose are estimated.
 
 ![Aruco Detections](images/debug_markers.png)
 
-Because the physical offsets between each marker and the true board corner are known from measurement, the system can accurately infer the precise location of each board corner in the camera frame. Using these corrected corner coordinates, the pipeline computes a homography that warps the perspective camera image into a rectified, top-down view of the board. 
+Because the physical offsets between each marker and the true board corner are known from measurement, the system can accurately infer the precise location of each board corner in the camera frame. Using these corrected corner coordinates, the pipeline computes a homography that warps the perspective camera image into a rectified, top-down view of the board.
 
 ![Warped Board](images/warped_board.png)
 
@@ -524,12 +548,14 @@ The follwing steps could be taken to improve the klotski solvers usability and f
 
 **Auto Colour Masking**
 
-The colour masking process as it stands is manual and by nessecity tedious. Auto colour masking would allow a customer to quickly get into the game without having to worry about different lighting conditions. 
+The colour masking process as it stands is manual and by necessity tedious. Auto colour masking would allow a customer to quickly get into the game without having to worry about different lighting conditions.
 
 It could run as follows:
-- Customer places klotski board in known calibration position at the programs direction.
-- A simple otimisation algorithm is run on the known configuration to find appropriate colour mask values.
+- Customer places klotski board in known calibration position at the program's direction.
+- A simple optimisation algorithm is run on the known configuration to find appropriate colour mask values.
 - Newly found colour mask values are saved and the customer is prompted to use the solver as normal.
+
+Alternatively, a YOLO-based object detection model could be trained on the Klotski pieces. This would eliminate the need for HSV tuning entirely and provide more robust detection under varying lighting conditions.
 
 **End Effector Feedback**
 
@@ -541,6 +567,34 @@ Possible solutions:
 - Distance sensor (ultrasonic of TOF) to measure distance fom objects (a short, unchanging distance would correlate to a picked up object).
 
 All of these solutions could easily be interfaced through the teensy board. The feedback from the teensy could then easily be sent to ROS through the gripper action server.
+
+**Piece-Level TF Frames**
+
+Currently, the sense node publishes a single `klotski_board` TF frame, and the arm manipulation node computes piece positions by applying cell offsets to this board origin. A more robust architecture would have the sense node publish individual TF frames for each piece (e.g., `piece_red_2x2`, `piece_blue_0`, etc.).
+
+This change would provide several benefits:
+
+1. **Single Responsibility Principle (SRP)**: The sense node becomes solely responsible for all perception—both board detection and piece localisation. The arm node simply looks up the target piece frame without needing to know about grid geometry or cell sizes.
+
+2. **Misplacement Detection**: If a piece is accidentally knocked or misplaced between moves, the sense node would detect its actual position and publish the updated TF frame. The arm could then target the piece's true location rather than its expected grid cell.
+
+3. **Simplified Arm Logic**: The manipulation node would request the TF transform from `base_link` to `piece_X` directly, eliminating coordinate calculations and reducing coupling between nodes.
+
+4. **Enhanced RViz Visualisation**: With individual piece TF frames, RViz can display the board and all pieces as separate coordinate axes, making it trivial to verify piece detection accuracy and debug positioning issues in real time.
+
+The updated TF tree would look like:
+
+```mermaid
+graph TD
+    A[base_link] --> B[camera_link]
+    B --> C[camera_color_optical_frame]
+    C --> D[klotski_board]
+    D --> E[piece_red_2x2]
+    D --> F[piece_green_1x2]
+    D --> G[piece_blue_0]
+    D --> H[piece_blue_1]
+    D --> I[...]
+```
 
 ## 👥 Contributors and Roles
 
