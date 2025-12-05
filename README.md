@@ -203,7 +203,7 @@ The system defines several custom ROS2 messages, services, and actions to facili
 
 ### Computer Vision
 
-The vision pipeline consists of several stages that transform raw camera data into a complete and reliable board representation. The process begins with the detection of the four ArUco markers (DICT_4X4_50, 65 mm) mounted at the corners of the board. Each marker (ID 0 (top-left), 1 (top-right), 2 (bottom-left), and 3 (bottom-right))is identified and its pixel and 3D pose are estimated. 
+The vision pipeline consists of several stages that transform raw camera data into a complete and reliable board representation. The process begins with the detection of the four ArUco markers (DICT_4X4_50, 65 mm) mounted at the corners of the board. Each marker (ID 0 (top-left), 1 (top-right), 2 (bottom-left) and 3 (bottom-right)) is identified and its pixel and 3D pose are estimated. 
 
 ![Aruco Detections](images/debug_markers.png)
 
