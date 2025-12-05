@@ -76,7 +76,7 @@ A ROS2-based robotic system for solving the Klotski sliding puzzle using compute
 
 This project delivers an interactive robotic system designed to support young learners in developing spatial reasoning and problem-solving skills through the classic Klotski sliding-block puzzle. The puzzle consists of blocks of various sizes (1×1, 1×2, 2×1, 2×2) arranged on a confined 4×5 board. The system is designed with children in mind and could be adopted by parents, schools and educational programs looking to enhance hands-on learning. The robot can transform any starting configuration into a chosen target pattern, reinforcing pattern recognition, logical reasoning and strategic planning.
 
-To make the activity engaging and educational, the robot demonstrates clear reasoning, safe physical manipulation, and transparent decision-making. The system:
+To make the activity engaging and educational, the robot demonstrates clear reasoning, safe physical manipulation and transparent decision-making. The system:
 
 - **Senses**: Uses computer vision to detect the current puzzle state and board position via ArUco markers
 - **Plans**: Generates optimal move sequences using BFS-based path planning to reach the goal configuration
