@@ -203,25 +203,21 @@ The system defines several custom ROS2 messages, services, and actions to facili
 
 ### Computer Vision
 
-The vision pipeline consists of four major stages:
+The vision pipeline consists of several stages that transform raw camera data into a complete and reliable board representation. The process begins with the detection of the four ArUco markers (DICT_4X4_50, 65 mm) mounted at the corners of the board. Each marker (ID 0 (top-left), 1 (top-right), 2 (bottom-left), and 3 (bottom-right))is identified and its pixel and 3D pose are estimated. 
 
-1. **ArUco Detection**
-   - ArUco markers (DICT_4X4_50, 65mm) placed at the four corners of the board are identified
-   - Marker IDs: TL=0, TR=1, BL=2, BR=3
-   - Their pixel and 3D positions are stored for transformations
+![Aruco Detections](images/debug_markers.png)
 
-2. **Board Isolation**
-   - The detected ArUco marker positions compute a homography matrix
-   - Applied to warp the camera view into a rectified top-down view of the board
+Because the physical offsets between each marker and the true board corner are known from measurement, the system can accurately infer the precise location of each board corner in the camera frame. Using these corrected corner coordinates, the pipeline computes a homography that warps the perspective camera image into a rectified, top-down view of the board. 
 
-3. **Grid Color Detection**
-   - A 4×5 grid is overlaid on the rectified board image
-   - HSV color masks identify the color of each grid cell
-   - Configurable via dashboard color masker tool
+![Warped Board](images/warped_board.png)
 
-4. **Board State Reconstruction**
-   - Groups neighbouring cells of the same colour to recover each Klotski piece shape
-   - In Klotski, this mapping is **injective** - each color configuration uniquely determines piece arrangement
+This transformation removes perspective distortion and aligns the image with the board’s dimensions. In this normalised space, the board is divided into a 4×5 grid, indexed from the bottom-left corner as cell (0,0). This consistent coordinate system allows the robot, planner, and UI to refer to piece locations.
+
+Once the grid is established, each cell is classified through HSV-based colour detection. Tunable thresholds—adjustable through our dashboard masking tool—enable robust cell classification across varying lighting conditions. The result is a clean, colour-labelled grid representing the state of the board.
+
+![Cell Overlay](images/cells_overlay.png)
+
+Finally, the system reconstructs the puzzle configuration by grouping neighbouring cells of the same colour to infer the Klotski piece shapes. Since each valid colour pattern corresponds to a unique arrangement of pieces, this grouping yields a fully validated board state ready for closed-loop planning and manipulation.
 
 
 ### Custom End Effector
@@ -254,7 +250,7 @@ Note: To ensure accurate angular control, the servo must be given a zero-degree 
 
 Our system provides two layers of visualisation. The custom User Interface to present the puzzle goal state to clearly understand the robot’s intended solution path and progress.
 
-![Dashboard UI](images/dashboard_ui.png)
+![Dashboard UI](images/UI_visualisation.png)
 
 In parallel, RViz is used to display the custom end effector model with its live orientation in the world, the TF poses of all four ArUco markers and the computed board pose to verify camera calibration and to confirm correct alignment between the computer vision and robot's coordinate system:
 
@@ -480,7 +476,7 @@ During the demonstration, the following components performed successfully:
 
 The sense node's published ArUco marker TF frames exhibited positional offsets from their true world positions. In the image below, the aruco frames can be seen misaligned with the physical markers on the board and the x-y plane of the `klotski_board` frame is not parallel with the board surface:
 
-![ArUco TF Frame Misalignment](images/rviz.jpg)
+![ArUco TF Frame Misalignment](images/rviz2.jpg)
 
 This is likely due to:
 
@@ -506,9 +502,9 @@ The system demonstrated successful integration of all software components. The c
 
 ### Engineering Challenges and How They Were Addressed
 
-**Perception Stability**
+**Computer Vision Stability**
 
-Developing a fully closed-loop Klotski robot required overcoming several engineering challenges across computer vision, planning and manipulation. Achieving reliable perception was one of the most significant hurdles. Early testing showed that raw ArUco detections could fluctuate by several centimetres, leading to unstable board poses and unreliable planning. To address this, we combined the `cv2.solvePnP` and depth-based pose estimation with a multi-frame stability filter that rejects inconsistent readings and locks in a marker pose only when it converges within a tight threshold.
+Developing a fully closed-loop Klotski robot required overcoming several engineering challenges across computer vision, planning and manipulation. Achieving reliable computer vision was one of the most significant hurdles. Early testing showed that raw ArUco detections could fluctuate by several centimetres, leading to unstable board poses and unreliable planning. To address this, we combined the `cv2.solvePnP` and depth-based pose estimation with a multi-frame stability filter that rejects inconsistent readings and locks in a marker pose only when it converges within a tight threshold.
 
 **Colour-Based Piece Classification**
 
