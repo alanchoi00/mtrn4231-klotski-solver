@@ -225,10 +225,25 @@ The custom end effector is a parallel gripper driven by a single servo motor. It
 
 ![Gripper assembly render](images/Assembly_2.png)
 
-- **Control**: Arduino-based serial communication
-- **Actuation**: Single servo motor for parallel jaw movement
+- **Control**: Teensy based control via PWM signal
+- **Actuation**: Single servo motor for parallel jaw movement, required decent level of torque
 - **Mounting**: Attaches to UR5e wrist via standard flange
-- TODO: Add more details and images
+- **Features** 3D printed fingertips are notably removable and swappable.
+- **Spring** An optinal spring can be placed beteen the finger links to remove any backlash and improve closing consistency.
+
+#### Assembly
+For Engineering drawings and assembly details please view the Drawings section at the bottom of this README.
+
+#### Control
+our setup, this PWM signal is supplied by a Teensy board. To keep the Teensy near our main computer and connected via USB, its PWM output is sent to the end effector over a long cable.
+
+The Teensy simply monitors the serial connection for messages from the PC. It expects an integer value transmitted as a string. Upon receiving this string, the Teensy generates a PWM signal to move the servo by the corresponding angular amount. For example, sending the message "40" via serial will cause the gripper to open by 40 degrees.
+
+Note: To ensure accurate angular control, the servo must be given a zero-degree PWM signal while the gripper is being assembled in a fully closed configuration.
+
+#### Wiring Digram
+
+![Gripper assembly render](Drawings/servo_wire.png)
 
 ### System Visualisation
 
