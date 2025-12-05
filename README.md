@@ -1,5 +1,7 @@
 # MTRN4231 Klotski Solver
 
+![Klotski Solver Demo](images/klotski_solver_demo.gif)
+
 - [MTRN4231 Klotski Solver](#mtrn4231-klotski-solver)
   - [📋 Overview](#-overview)
   - [🏗️ System Architecture](#️-system-architecture)
@@ -16,6 +18,9 @@
   - [🔧 Technical Components](#-technical-components)
     - [Computer Vision](#computer-vision)
     - [Custom End Effector](#custom-end-effector)
+      - [Assembly](#assembly)
+      - [Control](#control)
+      - [Wiring Digram](#wiring-digram)
     - [System Visualisation](#system-visualisation)
     - [Closed-Loop Operation](#closed-loop-operation)
   - [🚀 Installation and Setup](#-installation-and-setup)
@@ -473,7 +478,11 @@ During the demonstration, the following components performed successfully:
 
 #### ArUco TF Frame Inaccuracy
 
-The sense node's published ArUco marker TF frames exhibited positional offsets from their true world positions. This is likely due to:
+The sense node's published ArUco marker TF frames exhibited positional offsets from their true world positions. In the image below, the aruco frames can be seen misaligned with the physical markers on the board and the x-y plane of the `klotski_board` frame is not parallel with the board surface:
+
+![ArUco TF Frame Misalignment](images/rviz.jpg)
+
+This is likely due to:
 
 1. **Camera intrinsic calibration drift**: The `cv2.solvePnP` function relies on accurate camera intrinsics (`fx`, `fy`, `ppx`, `ppy`, distortion coefficients). Small errors in these parameters—especially from factory defaults or environmental changes (temperature, focus)—propagate into the estimated marker pose.
 2. **Hand-eye calibration residual error**: The static transform from `camera_link` to `base_link` (hand-eye calibration) may contain residual errors that compound with marker pose estimation.
@@ -492,14 +501,6 @@ The MoveIt2-based arm manipulation node experienced intermittent planning failur
 ### Demonstration Outcome
 
 The system demonstrated successful integration of all software components. The closed-loop sense-plan-act architecture was validated: the brain node correctly triggered camera captures, the plan node computed solutions, and the UI displayed real-time state. However, full autonomous puzzle solving was not achieved due to the ArUco TF frame offsets causing the arm to miss target piece positions.
-
-<!-- TODO: Add demonstration video (10-30s showing one full cycle) -->
-<!-- TODO: Add screenshots of:
-  - Dashboard UI in operation
-  - RViz visualization showing TF frames
-  - Camera feed with ArUco detection overlay
-  - Board state detection result
--->
 
 ## 💬 Discussion and Future Work
 
