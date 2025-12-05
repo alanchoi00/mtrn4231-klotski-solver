@@ -419,10 +419,7 @@ The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection V
 
 1. Power on the UR5e and ensure the teach pendant shows the robot in **Remote Control** mode.
 2. On the teach pendant, navigate to **Program Robot → Load Program** and load `ros2.urpd` (this external control program is pre-installed on all UNSW UR5e arms).
-3. On your PC, run the Klotski launch script:
-   ```bash
-   ./runKlotski.sh <optional camera TF args>
-   ```
+3. On your PC, run the Klotski launch script (as described in the ["⚙️ Running the System"](#️-running-the-system) section below).
 4. Once the system is running, press **Play** on the teach pendant to start the external control program.
 5. Verify connectivity by performing a small test motion in RViz:
    - In RViz, use the MoveIt MotionPlanning panel to plan and execute a minor joint movement.
