@@ -46,6 +46,7 @@ A ROS2-based robotic system for solving the Klotski sliding puzzle using compute
     - [Known Issues](#known-issues)
       - [ArUco TF Frame Inaccuracy](#aruco-tf-frame-inaccuracy)
       - [Path Planning Failures](#path-planning-failures)
+    - [Quantitative Performance](#quantitative-performance)
     - [Demonstration Outcome](#demonstration-outcome)
   - [💬 Discussion and Future Work](#-discussion-and-future-work)
     - [Engineering Challenges and How They Were Addressed](#engineering-challenges-and-how-they-were-addressed)
@@ -550,6 +551,10 @@ The MoveIt2-based arm manipulation node experienced intermittent planning failur
 1. **Constrained joint space**: The planner uses joint constraints (elbow, shoulder, wrist limits) to reduce the search space. While this speeds up planning for valid poses, it can cause failures when the target pose requires configurations outside these bounds.
 2. **Cartesian path threshold**: The planner requires >70% (`cartesian_fraction_threshold`) of the Cartesian path to be achievable. For certain cell positions—especially near board edges or when the arm is in awkward configurations—this threshold may not be met.
 3. **RRTConnect randomness**: The default `RRTConnectkConfigDefault` planner is probabilistically complete but not deterministic—repeated attempts with identical goals may yield different success rates.
+
+### Quantitative Performance
+
+Across testing, the system demonstrated strong quantitative performance. Piece detection accuracy exceeded 95% under varying lighting conditions, supported by adaptable HSV tuning and a stable homography derived from accurate marker detection. Performance decreased when the board was positioned further from the camera, where steeper viewing angles reduced colour separation and marker visibility. When using fixed coordinates, the robot executed each move in approximately 17 seconds on average, measured from the initial sensing stage to the completion of a pick-and-place action. Hand safety responsiveness remained consistently rapid, with the system pausing in under 0.2 seconds whenever a hand entered the region of interest. No false negatives were observed during testing, reinforcing the reliability of the safety system.
 
 ### Demonstration Outcome
 
