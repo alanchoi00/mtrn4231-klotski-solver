@@ -520,15 +520,15 @@ The end effector required several iterations to achieve reliable gripping across
 
 ### Future Work
 
-The follwinf steps could be taken to improve the klotski solvers usability and function.
+The follwing steps could be taken to improve the klotski solvers usability and function.
 
 **Auto Colour Masking**
 
-The colour masking process as it stands is manual and by nessecity tedious. Auto colour masking would allow a cutomer to quickly get into the game without having to worry about different lighting conditions. 
+The colour masking process as it stands is manual and by nessecity tedious. Auto colour masking would allow a customer to quickly get into the game without having to worry about different lighting conditions. 
 
 It could run as follows:
-- Customer placed klotski board in known calibration position at the programs direction.
-- A simple otimisation algorthm is run on the known configuration to find appropriate colour mask values.
+- Customer places klotski board in known calibration position at the programs direction.
+- A simple otimisation algorithm is run on the known configuration to find appropriate colour mask values.
 - Newly found colour mask values are saved and the customer is prompted to use the solver as normal.
 
 **End Effector Feedback**
@@ -536,9 +536,9 @@ It could run as follows:
 In the case where a gripper attemps to pick up a block but fails, the current system will not realise this fact until after it has completed a movement sequence. A simple fix for this would be to incorporate immediate feedback from the gripper itself.
 
 Possible solutions:
-- button on gripper fingertip whicch is pressed when an object is picked up.
-- pressure sensor on fingertip which would work similary to the button.
-- distance sensor (ultrasonic of TOF) to measure distacne fom objects (a short, unchanging distance would correlate to a picked up object).
+- Button on gripper fingertip which is pressed when an object is picked up.
+- Pressure sensor on fingertip which would work similary to the button.
+- Distance sensor (ultrasonic of TOF) to measure distance fom objects (a short, unchanging distance would correlate to a picked up object).
 
 All of these solutions could easily be interfaced through the teensy board. The feedback from the teensy could then easily be sent to ROS through the gripper action server.
 
