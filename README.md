@@ -249,7 +249,7 @@ Finally, the system reconstructs the puzzle configuration by grouping neighbouri
 
 The custom end effector is a parallel gripper driven by a single servo motor. It consists primarily of laser-cut acrylic sheet and plywood.
 
-![Gripper assembly render](images/Assembly_2.png)
+![Gripper assembly render](images/assembly_render.png)
 
 - **Control**: Teensy based control via PWM signal
 - **Actuation**: Single servo motor for parallel jaw movement, required decent level of torque
