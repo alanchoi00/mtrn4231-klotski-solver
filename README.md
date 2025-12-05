@@ -491,11 +491,6 @@ The system demonstrated successful integration of all software components. The c
 
 ## 💬 Discussion and Future Work
 
-- Briefly discuss major engineering challenges faced and how they were addressed.
-- Outline opportunities for improvement or extensions – what would you do better for
-“Version 2.0”.
-- Summarise what makes your approach novel, creative, or particularly effective.
-
 ### Engineering Challenges and How They Were Addressed
 
 **Perception Stability**
