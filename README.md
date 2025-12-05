@@ -413,23 +413,37 @@ The safety monitoring ROI can be adjusted via the dashboard's **Hand Detection V
 ![Hand Safety Zone Calibration](images/hand_safety_zone_calibration_demo.gif)
 
 ### Hardware Setup
+
+**UR5e Arm Setup**
+
+1. Power on the UR5e and ensure the teach pendant shows the robot in **Remote Control** mode.
+2. On the teach pendant, navigate to **Program Robot → Load Program** and load `ros2.urpd` (this external control program is pre-installed on all UNSW UR5e arms).
+3. On your PC, run the Klotski launch script:
+   ```bash
+   ./runKlotski.sh <optional camera TF args>
+   ```
+4. Once the system is running, press **Play** on the teach pendant to start the external control program.
+5. Verify connectivity by performing a small test motion in RViz:
+   - In RViz, use the MoveIt MotionPlanning panel to plan and execute a minor joint movement.
+   - If execution fails, press **Stop** on the teach pendant, then **Play** again to restart the external control program, and retry the motion.
+
 **Teensy Wiring**
-- connect teensy to PC via usb cable (this will also provide power)
-- connect PWM pin of teensy to servo, via long robot line cable.
-- connect teensy ground pin robot line ground pin.
+- Connect Teensy to PC via USB cable (this also provides power).
+- Connect PWM pin of Teensy to servo via the long robot line cable.
+- Connect Teensy ground pin to robot line ground pin.
 
-**gripper Setup**
-- Ensure servo is in its zero position and the is gripper in its closed configuration during assembly.
-- interface gripper mount to robot receptacle.
-- connect servo ground, power and signal pins to ground, 5 votls and the teensy PWM line respectively.
+**Gripper Setup**
+- Ensure servo is in its zero position and the gripper is in its closed configuration during assembly.
+- Interface gripper mount to robot receptacle.
+- Connect servo ground, power, and signal pins to ground, 5V, and the Teensy PWM line respectively.
 
-Feel free to tes the servos movement with the follwing bash commands
+Feel free to test the servo's movement with the following bash commands:
 ```bash
-#set up - run once
+# Setup - run once
 stty -F /dev/ttyACM0 9600 cs8 clocal igncr
 
-# set angle signal - run when you wish to change servo angle
-echo "[integer string 180 - 0]" > /dev/ttyACM0
+# Set angle signal - run when you wish to change servo angle
+echo "[integer 0-180]" > /dev/ttyACM0
 ```
 
 For more information regarding wiring, refer to the wiring diagram in the end effector overview.
