@@ -6,7 +6,6 @@
     - [RQT Node Graph](#rqt-node-graph)
     - [Package-Level Interaction](#package-level-interaction)
     - [Behaviour Tree](#behaviour-tree)
-      - [Closed-Loop Operation](#closed-loop-operation)
       - [Brain Node](#brain-node)
       - [Sense Node](#sense-node)
       - [Hand Safety Node](#hand-safety-node)
@@ -18,7 +17,7 @@
     - [Computer Vision](#computer-vision)
     - [Custom End Effector](#custom-end-effector)
     - [System Visualisation](#system-visualisation)
-    - [Closed-Loop Operation](#closed-loop-operation-1)
+    - [Closed-Loop Operation](#closed-loop-operation)
   - [🚀 Installation and Setup](#-installation-and-setup)
     - [Prerequisites](#prerequisites)
       - [System Requirements](#system-requirements)
@@ -126,8 +125,6 @@ flowchart TD
     S4 -.->|Interrupts| J
     S6 -.->|Resumes| L
 ```
-
-#### Closed-Loop Operation
 
 #### Brain Node
 The central orchestrator that coordinates all system operations through a modular manager architecture. It manages the complete sense-plan-act loop using a 5-phase manipulation sequence (Sense -> Plan -> Approach -> Grip Close -> Pick/Place -> Grip Open -> Retreat). The node handles UI commands for mode switching (auto/step/pause/reset), subscribes to board state updates from the sense node, integrates with the safety system to pause/resume operations when hands are detected, and delegates tasks to specialised managers (UIManager, ServiceManager, ActionExecutor, PipelineOrchestrator). The pipeline orchestrator implements a **Chain of Responsibility pattern** where handlers are processed sequentially, each deciding whether to handle the current state or pass to the next handler in the chain.
