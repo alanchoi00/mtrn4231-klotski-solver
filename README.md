@@ -254,7 +254,7 @@ The custom end effector is a parallel gripper driven by a single servo motor. It
 - **Control**: Teensy based control via PWM signal
 - **Actuation**: Single servo motor for parallel jaw movement, required decent level of torque
 - **Mounting**: Attaches to UR5e wrist via standard flange
-- **Features** 3D printed fingertips are notably removable and swappable.
+- **Features** 3D printed fingertips are notably removable and swappable. Sandpaper on the fingertips increases firction and grip consistency.
 - **Spring** An optinal spring can be placed beteen the finger links to remove any backlash and improve closing consistency.
 
 #### Assembly
