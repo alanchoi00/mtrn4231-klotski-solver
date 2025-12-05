@@ -567,7 +567,7 @@ Developing a fully closed-loop Klotski robot required overcoming several enginee
 
 **Colour-Based Piece Classification**
 
-Robust piece classification also posed difficulties due to colour variability, reflections, and shadows on the physical board. We addressed this by developing a carefully tuned HSV segmentation pipeline, producing clean masks and consistent grid-level classification across different lighting conditions.
+Robust piece classification also posed difficulties due to colour variability, reflections and shadows on the physical board. We addressed this by developing a manual HSV calibration tool, producing clean masks and consistent grid-level classification across different lighting conditions.
 
 **Motion Planning Reliability**
 
